@@ -1,0 +1,195 @@
+"""
+Pipeline Bridge.
+
+Creates and wires the full AgenticPipeline using GroqManager
+instead of OllamaManager. This is the single entry point
+for FastAPI endpoints to interact with the pipeline.
+"""
+
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+
+from pipeline.agent.base_tool import BaseTool
+from pipeline.agent.router import AgentRouter
+from pipeline.context.context_builder import ContextBuilder
+from pipeline.embeddings.embedding_manager import EmbeddingManager
+from pipeline.generation.prompt_builder import PromptBuilder
+from pipeline.pipeline.agentic_pipeline import AgenticPipeline
+from pipeline.pipeline.online_pipeline import OnlinePipeline
+from pipeline.pipeline.pipeline_result import PipelineResult
+from pipeline.reflection.reflector import Reflector
+from pipeline.reranking.reranker import CrossEncoderReranker
+from pipeline.retrieval.faiss_manager import FAISSManager
+from pipeline.retrieval.bm25_manager import BM25Manager
+from pipeline.retrieval.hybrid_retriever import HybridRetriever
+from pipeline.tools.chat_tool import ChatTool
+from pipeline.tools.code_tool import CodeTool
+from pipeline.tools.rag_tool import RAGTool
+from pipeline.validation.guardrail import Guardrail
+from pipeline.validation.query_rewriter import QueryRewriter
+from pipeline.validation.validation_layer import ValidationLayer
+
+from pipeline.llm.groq_manager import GroqManager
+from app.config import get_settings
+
+import logging
+
+logger = logging.getLogger("askrab.pipeline_bridge")
+
+
+class PipelineBridge:
+    """
+    Singleton that owns all pipeline components.
+    Initialized once at application startup.
+    """
+
+    def __init__(self) -> None:
+        settings = get_settings()
+        self._settings = settings
+        self._groq = GroqManager(api_key=settings.groq_api_key)
+
+        # ── Embedding model (local, free) ───────────────────────────────
+        self._embedding_manager = EmbeddingManager(
+            model_name="all-MiniLM-L6-v2"   # 384-dim, fast, free
+        )
+
+        # ── FAISS vector store ───────────────────────────────────────────
+        faiss_dir = os.path.abspath(settings.faiss_index_dir)
+        os.makedirs(faiss_dir, exist_ok=True)
+        self._faiss = FAISSManager(
+            index_path=os.path.join(faiss_dir, "index.faiss"),
+            metadata_path=os.path.join(faiss_dir, "metadata.pkl"),
+            embedding_manager=self._embedding_manager,
+        )
+
+        # ── BM25 sparse retriever ────────────────────────────────────────
+        self._bm25 = BM25Manager()
+
+        # ── Hybrid retriever ─────────────────────────────────────────────
+        self._retriever = HybridRetriever(
+            faiss_manager=self._faiss,
+            bm25_manager=self._bm25,
+            faiss_weight=0.7,
+            bm25_weight=0.3,
+        )
+
+        # ── Reranker ─────────────────────────────────────────────────────
+        self._reranker = CrossEncoderReranker(
+            model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+
+        # ── Context + prompt builders ────────────────────────────────────
+        self._context_builder = ContextBuilder()
+        self._prompt_builder = PromptBuilder()
+
+        # ── Online pipeline (RAG core) ───────────────────────────────────
+        self._online_pipeline = OnlinePipeline(
+            retriever=self._retriever,
+            reranker=self._reranker,
+            context_builder=self._context_builder,
+            prompt_builder=self._prompt_builder,
+            groq_manager=self._groq,
+            chat_model=settings.groq_chat_model,
+        )
+
+        # ── Tools ────────────────────────────────────────────────────────
+        self._chat_tool = ChatTool(
+            groq_manager=self._groq,
+            model=settings.groq_chat_model,
+        )
+
+        self._code_tool = CodeTool(
+            groq_manager=self._groq,
+            model=settings.groq_code_model,
+        )
+
+        self._rag_tool = RAGTool(
+            online_pipeline=self._online_pipeline,
+            groq_manager=self._groq,
+            fallback_model=settings.groq_chat_model,
+        )
+
+        # ── Validation layer ─────────────────────────────────────────────
+        self._validator = ValidationLayer(
+            groq_manager=self._groq,
+            model=settings.groq_chat_model,
+            threshold=settings.confidence_threshold,
+            weights={
+                "correctness": 0.5,
+                "completeness": 0.3,
+                "citations": 0.2,
+            },
+        )
+
+        # ── Reflector ────────────────────────────────────────────────────
+        self._reflector = Reflector(validator=self._validator)
+
+        # ── Query rewriter ───────────────────────────────────────────────
+        self._query_rewriter = QueryRewriter(
+            groq_manager=self._groq,
+            model=settings.groq_rewriter_model,
+        )
+
+        # ── Guardrail ────────────────────────────────────────────────────
+        self._guardrail = Guardrail()
+
+        # ── Router ───────────────────────────────────────────────────────
+        self._router = AgentRouter(
+            groq_manager=self._groq,
+            model=settings.groq_router_model,
+        )
+
+        # ── Agentic pipeline ─────────────────────────────────────────────
+        self._pipeline = AgenticPipeline(
+            guardrail=self._guardrail,
+            router=self._router,
+            chat_tool=self._chat_tool,
+            code_tool=self._code_tool,
+            rag_tool=self._rag_tool,
+            validator=self._validator,
+            reflector=self._reflector,
+            query_rewriter=self._query_rewriter,
+        )
+
+        logger.info("PipelineBridge initialized successfully.")
+
+    @property
+    def pipeline(self) -> AgenticPipeline:
+        return self._pipeline
+
+    @property
+    def embedding_manager(self) -> EmbeddingManager:
+        return self._embedding_manager
+
+    @property
+    def faiss_manager(self) -> FAISSManager:
+        return self._faiss
+
+    @property
+    def bm25_manager(self) -> BM25Manager:
+        return self._bm25
+
+    def run(self, query: str, direct_rag: bool = False) -> PipelineResult:
+        return self._pipeline.run(query, direct_rag=direct_rag)
+
+    def run_stream(self, query: str, direct_rag: bool = False):
+        return self._pipeline.run_stream(query, direct_rag=direct_rag)
+
+
+_bridge_instance: PipelineBridge | None = None
+
+
+def get_pipeline_bridge() -> PipelineBridge:
+    """Return the singleton PipelineBridge, initializing it on first call."""
+    global _bridge_instance
+    if _bridge_instance is None:
+        _bridge_instance = PipelineBridge()
+    return _bridge_instance
+
+
+def reset_pipeline_bridge() -> None:
+    """Reset the singleton (useful for testing)."""
+    global _bridge_instance
+    _bridge_instance = None
