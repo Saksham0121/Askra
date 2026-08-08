@@ -1,204 +1,130 @@
-# Askra — Enterprise RAG Knowledge Assistant
+# Askrab — Intelligent Agentic RAG System
+
+> A 7-layer agentic RAG pipeline with FastAPI backend, React dashboard, and JWT RBAC.
 
 ---
 
-## Overview
+## Architecture
 
-Askea is an advanced internal knowledge assistant that enables organizations to securely upload documents (PDFs, DOCX, PPTX, TXT) and ask natural language questions. It utilizes a **multi-stage Advanced RAG pipeline** to provide highly accurate, citation-backed answers grounded purely in the uploaded enterprise knowledge base.
-
-## System Architecture
-
-### Full-Stack Architecture Roles
-
-The InsightFlow AI platform is built on a decoupled, scalable architecture separating the user interface from the heavy AI processing logic.
-
-#### 🖥️ Frontend Role (React + Vite)
-- **User Interface & Experience**: Provides a responsive, modern interface for employees, managers, and admins built with React 18, Tailwind CSS, and ShadCN UI.
-- **State Management & Caching**: Uses React Query for efficient data fetching, caching, and background synchronization of chat history and analytics.
-- **Real-Time Interactions**: Handles real-time streaming of LLM responses via Server-Sent Events (SSE) so users see answers generated token-by-token.
-- **Data Visualization**: Renders interactive analytics dashboards using Recharts to visualize query trends and department activity.
-
-#### ⚙️ Backend Role (FastAPI)
-- **API Gateway**: Exposes highly concurrent, async RESTful endpoints for the frontend to interact with using FastAPI.
-- **Security & RBAC**: Manages JWT-based authentication, verifying user permissions, and enforcing role-based access control (Admin, Manager, Employee) on every request.
-- **Orchestration**: Serves as the central hub connecting the MongoDB metadata store, the local FAISS vector store, and external Gemini API.
-- **Heavy Lifting (RAG Agent)**: Executes the advanced multi-stage RAG pipeline (Document extraction, hybrid retrieval, cross-encoder reranking, LLM answer generation) efficiently on the server.
-
-### High-Level Overview
-
-```text
-╔══════════════════════════════════════════════════════════════════════╗
-║                        RAG AGENT SYSTEM                             ║
-╠══════════════════════╦═══════════════════════════════════════════════╣
-║   INGESTION LAYER    ║              QUERY LAYER                     ║
-║                      ║                                               ║
-║  PDF/DOCX Files      ║   User Question                              ║
-║      │               ║        │                                      ║
-║      ▼               ║        ▼                                      ║
-║  Text Extraction     ║   ① Dynamic Router ─(BLOCK)──→ Reject        ║
-║  (Multi-format)      ║        │   └──(LLM)──→ General LLM Answer    ║
-║      │               ║        ▼ (RAG)                                ║
-║      ▼               ║   ② Query Rewriting (Gemini LLM)             ║
-║  Chunking            ║        │                                      ║
-║ (1000 char, 200 ovlp)║        ▼                                      ║
-║      │               ║   ③ Hybrid Retrieval                         ║
-║      ▼               ║   ┌──────────┬──────────┐                    ║
-║  Embeddings          ║   │  FAISS   │   BM25   │                    ║
-║  (text-embedding-004)║   │ semantic │ keyword  │                    ║
-║      │               ║   └────┬─────┴─────┬────┘                    ║
-║      ▼               ║        │  Fusion   │                          ║
-║  FAISS Vector Store  ║        ▼ + Metadata Boost                    ║
-║                      ║   ④ CrossEncoder Reranking                   ║
-║                      ║        │                                      ║
-║                      ║        ▼                                      ║
-║                      ║   ⑤ Gemini Answer Generation                 ║
-║                      ║        │                                      ║
-║                      ║        ▼                                      ║
-║                      ║   Answer + Source Citations                   ║
-╚══════════════════════╩═══════════════════════════════════════════════╝
 ```
-
-
-## Pipeline Deep Dive
-
-### 1. Ingestion Pipeline
-
-```text
-Document File(s)
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│         TEXT EXTRACTION                 │
-│  • PyMuPDF (PDFs)                       │
-│  • python-docx (Word docs)              │
-│  • python-pptx (Presentations)          │
-│  • Native Reader (TXT)                  │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│         TEXT CLEANING                   │
-│  • Remove headers/footers               │
-│  • Normalize unicode & formatting       │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│         CHUNKING ENGINE                 │
-│  RecursiveCharacterTextSplitter         │
-│  chunk_size    = 1000 chars              │
-│  chunk_overlap = 200 chars              │
-└──────────────────┬──────────────────────┘
-                   │ chunks[ {text, metadata, department} ]
-                   ▼
-┌─────────────────────────────────────────┐
-│         EMBEDDING GENERATION            │
-│  Model: models/text-embedding-004       │
-│  Dimension: 768                         │
-└──────────────────┬──────────────────────┘
-                   │
-                   ▼
-┌─────────────────────────────────────────┐
-│         FAISS INDEX                     │
-│  Filtered by Department Metadata        │
-└─────────────────────────────────────────┘
-```
-
-### 2. Query Pipeline
-
-```text
-User Question: "What are penalties for data breach under DPDP Act?"
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 1 — DYNAMIC ROUTER & GUARDRAILS                           │
-│  Layer 1: Check against static blocked patterns                 │
-│  Layer 2: Fast match against extracted keywords                 │
-│  Layer 3: Gemini assigns intent (BLOCK, LLM, or RAG)            │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │ (If RAG)
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 2 — QUERY REWRITING (Gemini LLM)                          │
-│                                                                 │
-│  Input:  "penalties for data breach under DPDP Act"             │
-│  Output: "penalties for data breach under Digital Personal      │
-│           Data Protection Act 2023"                             │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │ rewritten_query
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 3 — HYBRID RETRIEVAL                                      │
-│                                                                 │
-│  ┌──────────────────────┐    ┌──────────────────────┐           │
-│  │   FAISS (semantic)   │    │    BM25 (keyword)    │           │
-│  │                      │    │                      │           │
-│  │  Cosine similarity   │    │  TF-IDF scoring      │           │
-│  │  Top-10 results      │    │  Top-10 results      │           │
-│  └──────────┬───────────┘    └───────────┬──────────┘           │
-│             │                            │                      │
-│             └────────────┬───────────────┘                      │
-│                          ▼                                      │
-│              WEIGHTED SCORE FUSION                              │
-│              FAISS weight: 0.7                                  │
-│              BM25  weight: 0.3                                  │
-│                          │                                      │
-│                          ▼                                      │
-│              Top-10 unique merged candidates                    │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 4 — CROSSENCODER RERANKING                                │
-│                                                                 │
-│  Model: cross-encoder/ms-marco-MiniLM-L-6-v2                    │
-│                                                                 │
-│  Scores every (query, chunk_text) pair jointly                  │
-│  10 candidates in → Top 5 out (ranked by relevance)             │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │ Top-5 reranked chunks
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 5 — GEMINI ANSWER GENERATION                              │
-│                                                                 │
-│  Model: gemini-1.5-flash                                        │
-│                                                                 │
-│  Rules: cite sources, use ONLY context, don't hallucinate       │
-│  Output: Answer + [Source: dpdp.pdf, Page: 21]                  │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-          {answer, sources[], num_sources, rewritten_query}
-```
-
-### 3. Smart Fallback Flow
-
-```mermaid
-flowchart TD
-    Q[User Question] --> G{Guardrails\nCheck}
-    G -->|blocked| R[Return: Out of domain]
-    G -->|valid| RAG[Run RAG Pipeline]
-    RAG --> A{Answer\ncontains\n'not found'?}
-    A -->|No| DONE[Return RAG Answer\nwith citations]
-    A -->|Yes| GEN[General Gemini LLM\nno documents]
-    GEN --> DONE2[Return General Answer\nlabelled as general knowledge]
+User Query
+  │
+  ▼
+L0 · Safety Guardrail      ← regex/pattern jailbreak + injection detection
+  │
+  ▼
+L1 · Intent Classifier     ← rule-based (75% conf threshold) + Groq LLM fallback
+  │
+  ▼
+L2 · Decision Router       ← FAISS relevance probe (~50ms) → RAG or LLM path
+  │
+  ├──(RAG)──────────────────────────────────────────────────────────────────┐
+  │                                                                         │
+  ▼                                                                         │
+L3 · RAG Tool                                                               │
+  ├─ Query Rewriter (Groq)                                                  │
+  ├─ Hybrid Retrieval: FAISS (0.7) + BM25 (0.3) → Top-10                   │
+  ├─ CrossEncoder Reranking → Top-5                                         │
+  └─ Groq Answer Generation                                                 │
+  │                                                                         │
+  ├──(Code)─→ L3 · Code Tool (Groq code model)                             │
+  │                                                                         │
+  ├──(Chat)─→ L3 · Chat Tool (Groq chat model)                             │
+  │                                                                         │
+  ▼◄────────────────────────────────────────────────────────────────────────┘
+L4 · NLI Validation        ← LLM-as-judge (correctness, completeness, citations)
+  │
+  ▼ (if score < threshold)
+L5 · Reflection Loop       ← up to 2 retries with refined prompt
+  │
+  ▼
+L6 · Response Assembly     ← answer + citations + confidence + tool trace
 ```
 
 ---
 
 ## Tech Stack
 
-| Component | Technology | Details |
-|---|---|---|
-| **Frontend** | React 18, Vite, Tailwind CSS, ShadCN | Modern UI with SSE streaming chat |
-| **Backend Framework** | FastAPI (Python 3.11) | High-performance async API |
-| **LLM & Embeddings** | Groq | Qwen 3.6 & text-embedding-004 |
-| **Vector Store** | FAISS | Local scalable semantic search |
-| **Keyword Search** | BM25 (`rank-bm25`) | Exact keyword matching |
-| **Reranker** | HuggingFace Cross-Encoder | `ms-marco-MiniLM-L-6-v2` |
-| **Document Parsers** | PyMuPDF, python-docx, etc. | Cascade fallback for robustness |
-| **Database** | MongoDB | Stores metadata, users, chat history |
-| **Auth** | JWT (Access + Refresh) | RBAC (Employee, Manager, Admin) |
-?
+| Layer | Technology |
+|---|---|
+| **LLM** | Groq (`llama-3.1-8b-instant`) |
+| **Embeddings** | `all-MiniLM-L6-v2` (local) |
+| **Vector Store** | FAISS (local) |
+| **Keyword Search** | BM25 (`rank-bm25`) |
+| **Reranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
+| **Backend** | FastAPI + Motor (async MongoDB) |
+| **Auth** | JWT (access + refresh) + bcrypt |
+| **RBAC** | Employee / Manager / Admin |
+| **Frontend** | React 18 + Vite + Recharts |
+| **Database** | MongoDB |
 
-groq_api_key = GROQ_API_KEY_REDACTED
+---
+
+## Quickstart
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Make sure MongoDB is running locally
+# Edit .env if needed (Groq key is pre-filled)
+
+uvicorn app.main:app --reload --port 8000
+```
+
+API docs available at: http://localhost:8000/docs
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend at: http://localhost:5173
+
+---
+
+## RBAC Roles
+
+| Role | Permissions |
+|---|---|
+| **Employee** | Chat, view documents in own department |
+| **Manager** | All employee permissions + upload docs + analytics |
+| **Admin** | All permissions + user management + audit logs |
+
+---
+
+## API Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register` | Public | Register new user |
+| POST | `/auth/login` | Public | Login → JWT tokens |
+| POST | `/auth/refresh` | Public | Refresh access token |
+| GET  | `/auth/me` | Any | Current user info |
+| POST | `/api/chat` | Any | Sync chat query |
+| GET  | `/api/chat/stream` | Any | SSE streaming chat |
+| GET  | `/api/chat/history` | Any | Chat history |
+| POST | `/api/documents/upload` | Any | Upload + ingest document |
+| GET  | `/api/documents` | Any | List documents |
+| DELETE | `/api/documents/{id}` | Admin | Delete document |
+| GET  | `/api/analytics/overview` | Manager+ | Stats overview |
+| GET  | `/api/analytics/query-trends` | Manager+ | Daily query trends |
+| GET  | `/api/analytics/tool-usage` | Manager+ | Tool breakdown |
+| GET  | `/api/admin/users` | Admin | List all users |
+| PATCH | `/api/admin/users/{id}` | Admin | Update user role/dept |
+| DELETE | `/api/admin/users/{id}` | Admin | Delete user |
+
+---
+
+## Future Scope
+
+- OCR support via Tesseract/EasyOCR for scanned PDFs
+- Department-level FAISS index isolation
+- Streaming SSE with proper auth headers (move away from query-param token)
+- Multi-modal document support (images, tables)
