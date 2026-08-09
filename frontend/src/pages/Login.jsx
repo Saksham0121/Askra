@@ -8,16 +8,39 @@ export default function Login() {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', department: 'general' });
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', department: 'general', role: 'employee' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setSuccess('');
+
+    if (!form.email || !form.email.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!form.password || form.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (form.password.length > 72) {
+      setError('Password cannot exceed 72 characters.');
+      return;
+    }
+
+    if (mode === 'register' && !form.full_name.trim()) {
+      setError('Full Name is required.');
+      return;
+    }
+
+    setLoading(true);
     try {
       if (mode === 'login') {
         const { data } = await api.post('/auth/login', { email: form.email, password: form.password });
@@ -26,10 +49,23 @@ export default function Login() {
       } else {
         await api.post('/auth/register', form);
         setMode('login');
-        setError('');
+        setSuccess('Account created successfully! Please sign in.');
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Something went wrong. Please try again.');
+      let errMsg = 'Something went wrong. Please try again.';
+      const detail = err.response?.data?.detail;
+
+      if (typeof detail === 'string') {
+        errMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errMsg = detail.map((item) => item.msg || item.message).filter(Boolean).join('. ');
+      } else if (err.response?.data?.message) {
+        errMsg = err.response.data.message;
+      } else if (err.message) {
+        errMsg = err.message;
+      }
+
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
@@ -46,6 +82,7 @@ export default function Login() {
         </div>
 
         {error && <div className="login-error">{error}</div>}
+        {success && <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, color: '#4ade80', fontSize: 13, textAlign: 'center' }}>{success}</div>}
 
         <form className="login-form" onSubmit={handleSubmit}>
           {mode === 'register' && (
@@ -55,16 +92,29 @@ export default function Login() {
                 <input className="input" name="full_name" placeholder="John Doe"
                   value={form.full_name} onChange={handleChange} required />
               </div>
+
               <div className="form-group">
-                <label className="form-label">Department</label>
-                <select className="input" name="department" value={form.department} onChange={handleChange}>
-                  <option value="general">General</option>
-                  <option value="legal">Legal</option>
+                <label className="form-label">Organization Role</label>
+                <select className="input" name="role" value={form.role} onChange={handleChange}>
+                  <option value="admin">Admin</option>
                   <option value="hr">HR</option>
-                  <option value="engineering">Engineering</option>
-                  <option value="finance">Finance</option>
+                  <option value="manager">Manager</option>
+                  <option value="employee">Employee</option>
                 </select>
               </div>
+
+              {['manager', 'employee'].includes(form.role) && (
+                <div className="form-group">
+                  <label className="form-label">Department Scope</label>
+                  <select className="input" name="department" value={form.department} onChange={handleChange}>
+                    <option value="general">General</option>
+                    <option value="legal">Legal</option>
+                    <option value="hr">HR</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="finance">Finance</option>
+                  </select>
+                </div>
+              )}
             </>
           )}
 

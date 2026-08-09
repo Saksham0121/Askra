@@ -71,6 +71,12 @@ class FAISSManager:
             f"Indexed {len(embedded_chunks)} chunk(s)."
         )
 
+    # Convenience method to embed and index raw chunks
+    def add_chunks(self, chunks: list, embeddings: list[list[float]]) -> None:
+        embedded = [EmbeddedChunk(chunk=c, embedding=emb) for c, emb in zip(chunks, embeddings)]
+        self.add(embedded)
+        self.save()
+
     # Retrieves top chunks based on query embedding.
     def search(
         self,

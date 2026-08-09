@@ -185,3 +185,7 @@ class PDFDocumentLoader:
             metadata=metadata,
             pages=pages,
         )
+
+
+# Backward compatibility alias
+PDFLoader = PDFDocumentLoader

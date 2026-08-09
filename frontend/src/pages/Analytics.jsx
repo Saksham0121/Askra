@@ -57,12 +57,12 @@ export default function Analytics() {
 
   return (
     <div className="page-body">
-      <div className="flex justify-between items-center" style={{ marginBottom: 24 }}>
+      <div className="page-header flex-header" style={{ marginBottom: 24 }}>
         <div>
-          <div className="section-title">Analytics Dashboard</div>
-          <div className="section-sub" style={{ marginBottom: 0 }}>Pipeline performance and usage insights</div>
+          <h1 className="page-title">Analytics Dashboard</h1>
+          <p className="page-subtitle">Pipeline performance and usage insights</p>
         </div>
-        <select className="input" style={{ width: 140 }} value={days} onChange={e => setDays(Number(e.target.value))}>
+        <select className="input analytics-days-select" style={{ width: 140 }} value={days} onChange={e => setDays(Number(e.target.value))}>
           <option value={7}>Last 7 days</option>
           <option value={14}>Last 14 days</option>
           <option value={30}>Last 30 days</option>
@@ -71,13 +71,13 @@ export default function Analytics() {
 
       {/* Stat Cards */}
       {loading ? (
-        <div className="grid-4" style={{ marginBottom: 24 }}>
-          {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 12 }} />)}
+        <div className="analytics-stat-grid" style={{ marginBottom: 24 }}>
+          {[1,2,3,4,5].map(i => <div key={i} className="skeleton" style={{ height: 100, borderRadius: 12 }} />)}
         </div>
       ) : (
-        <div className="grid-4" style={{ marginBottom: 24, gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <div className="analytics-stat-grid" style={{ marginBottom: 24 }}>
           {statCards.map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="card">
+            <div key={label} className="card stat-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div className="stat-value" style={{ color }}>{value}</div>

@@ -55,11 +55,13 @@ export default function Admin() {
 
   return (
     <div className="page-body">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-        <Shield size={22} style={{ color: 'var(--accent-violet)' }} />
-        <div className="section-title">Admin Panel</div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <Shield size={22} style={{ color: 'var(--accent-teal)' }} />
+          <h1 className="page-title">Admin Panel</h1>
+        </div>
+        <p className="page-subtitle">Manage users, roles, and permissions</p>
       </div>
-      <div className="section-sub">Manage users, roles, and permissions</div>
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

@@ -55,6 +55,19 @@ class BM25Manager:
             f"Built BM25 index with {len(corpus)} chunk(s)."
         )
 
+    # Convenience method to add embedded chunks and rebuild index
+    def add_chunks(self, embedded_chunks: list[EmbeddedChunk]) -> None:
+        all_chunks = self.embedded_chunks + embedded_chunks
+        self.build(all_chunks)
+        self.save()
+
+    def add_documents(self, chunks: list, embeddings: list[list[float]] | None = None) -> None:
+        if embeddings:
+            embedded = [EmbeddedChunk(chunk=c, embedding=emb) for c, emb in zip(chunks, embeddings)]
+        else:
+            embedded = [EmbeddedChunk(chunk=c, embedding=[]) for c in chunks]
+        self.add_chunks(embedded)
+
     # Searches the BM25 index for relevant chunks.
     def search(
         self,

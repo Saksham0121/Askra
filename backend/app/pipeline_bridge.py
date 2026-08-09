@@ -20,9 +20,11 @@ from pipeline.pipeline.agentic_pipeline import AgenticPipeline
 from pipeline.pipeline.online_pipeline import OnlinePipeline
 from pipeline.pipeline.pipeline_result import PipelineResult
 from pipeline.reflection.reflector import Reflector
-from pipeline.reranking.reranker import CrossEncoderReranker
+from pipeline.reranking import CrossEncoderReranker
 from pipeline.retrieval.faiss_manager import FAISSManager
 from pipeline.retrieval.bm25_manager import BM25Manager
+from pipeline.retrieval.dense_retriever import DenseRetriever
+from pipeline.retrieval.sparse_retriever import SparseRetriever
 from pipeline.retrieval.hybrid_retriever import HybridRetriever
 from pipeline.tools.chat_tool import ChatTool
 from pipeline.tools.code_tool import CodeTool
@@ -36,17 +38,19 @@ from app.config import get_settings
 
 import logging
 
-logger = logging.getLogger("askrab.pipeline_bridge")
+logger = logging.getLogger("askrab")
 
 
 class PipelineBridge:
     """
-    Singleton that owns all pipeline components.
-    Initialized once at application startup.
+    Bridge connecting FastAPI endpoints to the underlying Askra RAG pipeline.
+    Instantiates managers, retrievers, tools, and Agentic / Online pipelines.
     """
 
-    def __init__(self) -> None:
-        settings = get_settings()
+    def __init__(self, settings=None):
+        if settings is None:
+            settings = get_settings()
+
         self._settings = settings
         self._groq = GroqManager(api_key=settings.groq_api_key)
 
@@ -59,20 +63,27 @@ class PipelineBridge:
         faiss_dir = os.path.abspath(settings.faiss_index_dir)
         os.makedirs(faiss_dir, exist_ok=True)
         self._faiss = FAISSManager(
+            dimension=self._embedding_manager.dimension,
             index_path=os.path.join(faiss_dir, "index.faiss"),
-            metadata_path=os.path.join(faiss_dir, "metadata.pkl"),
-            embedding_manager=self._embedding_manager,
+            metadata_path=os.path.join(faiss_dir, "metadata.json"),
         )
 
         # ── BM25 sparse retriever ────────────────────────────────────────
-        self._bm25 = BM25Manager()
+        self._bm25 = BM25Manager(
+            index_path=os.path.join(faiss_dir, "bm25.pkl")
+        )
 
         # ── Hybrid retriever ─────────────────────────────────────────────
-        self._retriever = HybridRetriever(
+        dense_retriever = DenseRetriever(
+            embedding_manager=self._embedding_manager,
             faiss_manager=self._faiss,
+        )
+        sparse_retriever = SparseRetriever(
             bm25_manager=self._bm25,
-            faiss_weight=0.7,
-            bm25_weight=0.3,
+        )
+        self._retriever = HybridRetriever(
+            dense_retriever=dense_retriever,
+            sparse_retriever=sparse_retriever,
         )
 
         # ── Reranker ─────────────────────────────────────────────────────

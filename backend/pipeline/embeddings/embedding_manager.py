@@ -51,6 +51,15 @@ class EmbeddingManager:
 
         return self._model
 
+    @property
+    def dimension(self) -> int:
+        """
+        Return the embedding dimension of the model.
+        """
+        if hasattr(self.model, "get_embedding_dimension"):
+            return self.model.get_embedding_dimension()
+        return self.model.get_sentence_embedding_dimension()
+
     # Generates an embedding for input text.
     def embed_text(
         self,

@@ -3,15 +3,16 @@ Auth Models — User, Role, Token schemas.
 """
 from __future__ import annotations
 from datetime import datetime
-from enum import str, auto
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
-class Role(str):
-    EMPLOYEE = "employee"
-    MANAGER = "manager"
+class Role(str, Enum):
     ADMIN = "admin"
+    HR = "hr"
+    MANAGER = "manager"
+    EMPLOYEE = "employee"
 
 
 # ── DB Models ──────────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ class RegisterRequest(BaseModel):
     full_name: str
     password: str = Field(min_length=6)
     department: str = "general"
+    role: str = Role.EMPLOYEE
 
 
 class LoginRequest(BaseModel):
