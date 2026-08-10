@@ -43,11 +43,7 @@ class CodeTool(BaseTool):
         yield {"type": "status", "message": "Writing code..."}
         prompt = _CODE_PROMPT.format(query=query)
         stream = self.groq_manager.generate_stream(model=self.model, prompt=prompt)
-        full_chunks = []
-        for chunk in stream:
-            full_chunks.append(chunk)
-            yield {"type": "chunk", "content": chunk}
-        answer = "".join(full_chunks).strip()
+        answer = "".join(stream).strip()
         logger.info("CodeTool streaming completed.")
         yield {"type": "result", "data": ToolResult(
             answer=answer, answer_source=AnswerSource.CODE, sources=[], context=""

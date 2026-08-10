@@ -1,5 +1,6 @@
 /* =====================================================
-   Askrab Design System — Global CSS
+   Askra Design System — Global CSS
+
    ChatGPT-Inspired Dark Theme with Cyber Teal Color Palette
    Colors from Palette: #001E1E | #002727 | #00312F | #014848 | #005958 | #016764
    ===================================================== */
@@ -122,11 +123,17 @@ input, textarea, select { font-family: inherit; }
 .brand-logo {
   width: 32px; height: 32px;
   border-radius: var(--radius-sm);
-  background: var(--gradient-card);
-  border: 1px solid var(--border-active);
+  background: transparent;
+  border: none;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--glow-teal);
   flex-shrink: 0;
+  overflow: hidden;
+}
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .brand-name {
   font-size: 17px;
@@ -244,7 +251,8 @@ input, textarea, select { font-family: inherit; }
   background: var(--bg-card);
   color: var(--text-primary);
 }
-.recent-item:hover .rename-pencil-btn {
+.recent-item:hover .rename-pencil-btn,
+.recent-item:hover .delete-session-btn {
   opacity: 1;
 }
 .recent-item.active {
@@ -270,6 +278,22 @@ input, textarea, select { font-family: inherit; }
   transition: opacity 0.15s;
   flex-shrink: 0;
   line-height: 1;
+}
+.delete-session-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  line-height: 1;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+.delete-session-btn:hover {
+  color: #f87171;
 }
 .recent-rename-input {
   flex: 1;
@@ -534,6 +558,14 @@ input, textarea, select { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--accent-glow);
   flex-shrink: 0;
+  overflow: hidden;
+}
+.msg-avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
 }
 .msg-body { flex: 1; min-width: 0; }
 .msg-author { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
@@ -875,11 +907,12 @@ input, textarea, select { font-family: inherit; }
   text-align: center;
   margin-bottom: 28px;
 }
-.login-logo-text {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
+.login-logo-img {
+  max-width: 140px;
+  height: auto;
+  display: block;
+  margin: 0 auto 8px;
+  object-fit: contain;
 }
 .login-subtitle {
   font-size: 13px;

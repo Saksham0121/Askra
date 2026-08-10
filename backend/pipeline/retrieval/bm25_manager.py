@@ -79,10 +79,11 @@ class BM25Manager:
         """
 
         if self.bm25 is None:
-
-            raise RuntimeError(
-                "BM25 index has not been built."
+            logger.warning(
+                "BM25 index has not been built yet (no documents indexed). "
+                "Returning empty sparse results."
             )
+            return []
 
         scores = self.bm25.get_scores(
             query.split()

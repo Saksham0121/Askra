@@ -77,9 +77,10 @@ export default function Login() {
 
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-text">Askrab</div>
+          <img src="/Askra_logo.png" alt="Askra" className="login-logo-img" />
           <div className="login-subtitle">Intelligent Agentic RAG System</div>
         </div>
+
 
         {error && <div className="login-error">{error}</div>}
         {success && <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, color: '#4ade80', fontSize: 13, textAlign: 'center' }}>{success}</div>}

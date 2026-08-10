@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../api/client';
 import {
   MessageSquare, FileText, BarChart2, Shield,
-  LogOut, Plus, PanelLeft, Clock, Sparkles
+  LogOut, Plus, PanelLeft, Clock, Trash2
 } from 'lucide-react';
 
 const NAV = [
@@ -56,6 +56,17 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
     setEditingId(null);
   };
 
+  const deleteSession = async (e, sessionId) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this chat? This cannot be undone.')) return;
+    try {
+      await api.delete(`/api/chat/sessions/${sessionId}`);
+      setSessions(prev => prev.filter(s => s._id !== sessionId));
+      // If the deleted session was active, clear the chat
+      if (activeSessionId === sessionId) onSelectSession?.(null);
+    } catch { /* silent */ }
+  };
+
   const visibleNav = NAV.filter(n => !n.roles || n.roles.includes(user?.role));
   const initials = user?.full_name
     ?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'U';
@@ -66,9 +77,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
       <div className="sidebar-top">
         <div className="sidebar-brand">
           <div className="brand-logo">
-            <Sparkles size={18} color="#FFAA85" />
+            <img src="/Askra_logo.png" alt="Askra" className="brand-logo-img" />
           </div>
-          {!isCollapsed && <span className="brand-name">Askrab</span>}
+          {!isCollapsed && <span className="brand-name">Askra</span>}
         </div>
         <button className="sidebar-toggle-btn" onClick={toggleSidebar} title="Toggle Sidebar">
           <PanelLeft size={18} />
@@ -133,7 +144,7 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
                       onClick={e => e.stopPropagation()}
                     />
                   ) : (
-                    <>
+                    <>  
                       <span
                         className="recent-title"
                         onDoubleClick={e => startRename(e, s)}
@@ -147,6 +158,13 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
                         onClick={e => startRename(e, s)}
                       >
                         ✏️
+                      </button>
+                      <button
+                        className="delete-session-btn"
+                        title="Delete chat"
+                        onClick={e => deleteSession(e, s._id)}
+                      >
+                        <Trash2 size={13} />
                       </button>
                     </>
                   )}

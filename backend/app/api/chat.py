@@ -246,3 +246,22 @@ async def get_session_messages(
     ).sort("timestamp", 1)
     msgs = await cursor.to_list(length=500)
     return {"messages": msgs, "session_name": session.get("name", "")}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+):
+    """Delete a chat session and all its messages."""
+    result = await chat_sessions_collection().delete_one({
+        "_id": ObjectId(session_id),
+        "user_id": str(current_user.id),
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Also delete all messages belonging to this session
+    await messages_collection().delete_many({"session_id": session_id})
+    return {"ok": True}
+

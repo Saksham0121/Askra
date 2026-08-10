@@ -41,11 +41,7 @@ class ChatTool(BaseTool):
         yield {"type": "status", "message": "Answering from general knowledge..."}
         prompt = _CHAT_PROMPT.format(query=query)
         stream = self.groq_manager.generate_stream(model=self.model, prompt=prompt)
-        full_chunks = []
-        for chunk in stream:
-            full_chunks.append(chunk)
-            yield {"type": "chunk", "content": chunk}
-        answer = "".join(full_chunks).strip()
+        answer = "".join(stream).strip()
         logger.info("ChatTool streaming completed.")
         yield {"type": "result", "data": ToolResult(
             answer=answer, answer_source=AnswerSource.LLM, sources=[], context=""

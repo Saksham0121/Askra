@@ -79,25 +79,14 @@ class RAGTool(BaseTool):
         stream = self.online_pipeline.groq_manager.generate_stream(
             model=self.online_pipeline.chat_model, prompt=prompt
         )
-
-        full_chunks: list[str] = []
-        for chunk in stream:
-            full_chunks.append(chunk)
-            yield {"type": "chunk", "content": chunk}
-
-        answer = "".join(full_chunks)
+        answer = "".join(stream)
 
         if self._is_fallback(answer, chunks):
-            logger.info("RAGTool: fallback detected. Streaming fallback now.")
+            logger.info("RAGTool: fallback detected. Generating fallback now.")
             yield {"type": "status", "message": "💡 No relevant doc found — drawing on general knowledge..."}
-            yield {"type": "clear_chunks"}
             prompt = _FALLBACK_PROMPT.format(query=query)
             fallback_stream = self.groq_manager.generate_stream(model=self.fallback_model, prompt=prompt)
-            fallback_chunks: list[str] = []
-            for chunk in fallback_stream:
-                fallback_chunks.append(chunk)
-                yield {"type": "chunk", "content": chunk}
-            answer = "".join(fallback_chunks)
+            answer = "".join(fallback_stream)
             yield {"type": "result", "data": ToolResult(
                 answer=answer, answer_source=AnswerSource.RAG_FALLBACK, sources=[], context=""
             )}

@@ -85,6 +85,12 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const esRef = useRef(null);
+  const typewriterRef = useRef(null);
+
+  // Clean up typewriter on unmount
+  useEffect(() => {
+    return () => { if (typewriterRef.current) clearInterval(typewriterRef.current); };
+  }, []);
 
   useEffect(() => {
     // When session changes: load history or clear for new chat
@@ -219,36 +225,50 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
             const idx = PIPELINE_LAYERS.findIndex(l => l.id === layer);
             setDoneLayerIds(PIPELINE_LAYERS.slice(0, idx).map(l => l.id));
           }
-        } else if (event.type === 'chunk') {
-          setMessages(prev => prev.map(m =>
-            m.id === assistantMsg.id ? { ...m, content: m.content + event.content } : m
-          ));
-        } else if (event.type === 'clear_chunks') {
-          setMessages(prev => prev.map(m =>
-            m.id === assistantMsg.id ? { ...m, content: '' } : m
-          ));
         } else if (event.type === 'result') {
           if (event.session_id) setSessionId(event.session_id);
           setDoneLayerIds(PIPELINE_LAYERS.map(l => l.id));
           setActiveLayer(null);
-          setMessages(prev => prev.map(m =>
-            m.id === assistantMsg.id ? {
-              ...m,
-              content: event.answer || m.content,
-              streaming: false,
-              sources: event.sources || [],
-              confidence_score: event.confidence_score,
-              answer_source: event.answer_source,
-              confidence_badge: event.confidence_badge,
-              answer_source_label: event.answer_source_label,
-              iterations: event.iterations,
-              latency_ms: event.latency_ms,
-              validation_reasoning: event.validation_reasoning,
-            } : m
-          ));
-          setIsStreaming(false);
           setStatusMsg('');
           es.close();
+
+          // Typewriter animation — type out the full answer char-by-char
+          const fullAnswer = event.answer || '';
+          const metadata = {
+            sources: event.sources || [],
+            confidence_score: event.confidence_score,
+            answer_source: event.answer_source,
+            confidence_badge: event.confidence_badge,
+            answer_source_label: event.answer_source_label,
+            iterations: event.iterations,
+            latency_ms: event.latency_ms,
+            validation_reasoning: event.validation_reasoning,
+          };
+
+          let charIndex = 0;
+          if (typewriterRef.current) clearInterval(typewriterRef.current);
+
+          typewriterRef.current = setInterval(() => {
+            charIndex++;
+            const slice = fullAnswer.slice(0, charIndex);
+            const done = charIndex >= fullAnswer.length;
+
+            setMessages(prev => prev.map(m =>
+              m.id === assistantMsg.id ? {
+                ...m,
+                content: slice,
+                streaming: !done,
+                ...(done ? metadata : {}),
+              } : m
+            ));
+
+            if (done) {
+              clearInterval(typewriterRef.current);
+              typewriterRef.current = null;
+              setIsStreaming(false);
+            }
+          }, 8); // ~125 chars/sec — fast but visibly animated
+
         } else if (event.type === 'error') {
           setMessages(prev => prev.map(m =>
             m.id === assistantMsg.id ? { ...m, content: `⚠️ ${event.message}`, streaming: false } : m
@@ -386,12 +406,14 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
               messages.map(msg => (
                 <div key={msg.id} className={`gpt-message-row ${msg.role}`}>
                   <div className="msg-avatar">
-                    {msg.role === 'user' ? 'U' : <Sparkles size={16} color="#FFAA85" />}
+                    {msg.role === 'user' ? 'U' : <img src="/Askra_logo.png" alt="Askra" className="msg-avatar-logo" />}
+
                   </div>
 
                   <div className="msg-body">
                     <div className="msg-author">
-                      {msg.role === 'user' ? 'You' : 'Askrab'}
+                      {msg.role === 'user' ? 'You' : 'Askra'}
+
                     </div>
 
                     <div className={`msg-content ${msg.streaming ? 'is-streaming' : ''}`}>
