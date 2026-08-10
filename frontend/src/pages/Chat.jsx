@@ -7,6 +7,7 @@ import {
   ArrowUp, ShieldAlert, Cpu, Menu
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import api from '../api/client';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -86,9 +87,47 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
   const esRef = useRef(null);
 
   useEffect(() => {
-    if (activeSessionId !== sessionId) {
-      setSessionId(activeSessionId);
-    }
+    // When session changes: load history or clear for new chat
+    if (activeSessionId === sessionId) return;
+    setSessionId(activeSessionId);
+    setMessages([]);
+    setIsStreaming(false);
+    setStatusMsg('');
+    setActiveLayer(null);
+    setDoneLayerIds([]);
+
+    if (!activeSessionId) return; // New Chat — just clear
+
+    // Load history for the selected session
+    let cancelled = false;
+    api.get(`/api/chat/sessions/${activeSessionId}/messages`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const loaded = [];
+        (data.messages || []).forEach((msg, i) => {
+          loaded.push({
+            role: 'user',
+            content: msg.query,
+            id: `hist-u-${i}`,
+          });
+          loaded.push({
+            role: 'assistant',
+            content: msg.answer,
+            id: `hist-a-${i}`,
+            streaming: false,
+            sources: msg.sources || [],
+            confidence_score: msg.confidence_score ?? null,
+            answer_source: msg.answer_source || '',
+            confidence_badge: null,
+            answer_source_label: msg.answer_source || '',
+            iterations: msg.iterations || 1,
+            latency_ms: msg.latency_ms || 0,
+          });
+        });
+        setMessages(loaded);
+      })
+      .catch(() => {}); // Silent on error
+    return () => { cancelled = true; };
   }, [activeSessionId]);
 
   useEffect(() => {

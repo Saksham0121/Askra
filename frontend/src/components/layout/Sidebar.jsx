@@ -19,6 +19,8 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
   const navigate = useNavigate();
   const location = useLocation();
   const [sessions, setSessions] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
   useEffect(() => {
     closeMobileSidebar?.();
@@ -26,21 +28,33 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
 
   useEffect(() => {
     let isMounted = true;
-    const fetchSessions = async () => {
+    const load = async () => {
       try {
         const { data } = await api.get('/api/chat/sessions');
-        if (isMounted && data.sessions) {
-          setSessions(data.sessions);
-        }
-      } catch (err) {
-        // Silent catch
-      }
+        if (isMounted && data.sessions) setSessions(data.sessions);
+      } catch { /* silent */ }
     };
-    fetchSessions();
+    load();
     return () => { isMounted = false; };
   }, [location.pathname, activeSessionId]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+
+  const startRename = (e, session) => {
+    e.stopPropagation();
+    setEditingId(session._id);
+    setEditingName(session.name || '');
+  };
+
+  const commitRename = async (sessionId) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) { setEditingId(null); return; }
+    try {
+      await api.patch(`/api/chat/sessions/${sessionId}`, { name: trimmed });
+      setSessions(prev => prev.map(s => s._id === sessionId ? { ...s, name: trimmed } : s));
+    } catch { /* silent */ }
+    setEditingId(null);
+  };
 
   const visibleNav = NAV.filter(n => !n.roles || n.roles.includes(user?.role));
   const initials = user?.full_name
@@ -98,14 +112,44 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
                   key={s._id}
                   className={`recent-item ${s._id === activeSessionId ? 'active' : ''}`}
                   onClick={() => {
+                    if (editingId === s._id) return;
                     onSelectSession?.(s._id);
                     navigate('/chat');
                   }}
                 >
                   <MessageSquare size={14} className="recent-icon" />
-                  <span className="recent-title">
-                    Session {s._id.slice(-6)}
-                  </span>
+
+                  {editingId === s._id ? (
+                    <input
+                      className="recent-rename-input"
+                      value={editingName}
+                      autoFocus
+                      onChange={e => setEditingName(e.target.value)}
+                      onBlur={() => commitRename(s._id)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { e.preventDefault(); commitRename(s._id); }
+                        if (e.key === 'Escape') { setEditingId(null); }
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <>
+                      <span
+                        className="recent-title"
+                        onDoubleClick={e => startRename(e, s)}
+                        title="Double-click to rename"
+                      >
+                        {s.name || `Session ${s._id.slice(-6)}`}
+                      </span>
+                      <button
+                        className="rename-pencil-btn"
+                        title="Rename"
+                        onClick={e => startRename(e, s)}
+                      >
+                        ✏️
+                      </button>
+                    </>
+                  )}
                 </div>
               ))
             )}
