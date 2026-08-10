@@ -109,11 +109,17 @@ async def chat(body: ChatRequest, current_user: UserInDB = Depends(get_current_u
     )
 
 
-async def _sse_generator(query: str, direct_rag: bool, user_id: str, session_id: str) -> AsyncGenerator[str, None]:
+async def _sse_generator(
+    query: str,
+    direct_rag: bool,
+    user_id: str,
+    session_id: str,
+    history: list[dict] | None = None,
+) -> AsyncGenerator[str, None]:
     bridge = get_pipeline_bridge()
     result_data = {}
     try:
-        for event in bridge.run_stream(query=query, direct_rag=direct_rag):
+        for event in bridge.run_stream(query=query, direct_rag=direct_rag, history=history or []):
             if event["type"] == "result":
                 r = event["data"]
                 result_data = {
@@ -165,8 +171,18 @@ async def chat_stream(
         })
         sid = str(sess.inserted_id)
 
+    # Fetch the last 6 messages from this session to build conversation history
+    history: list[dict] = []
+    raw_msgs = await messages_collection().find(
+        {"session_id": sid},
+        {"_id": 0, "query": 1, "answer": 1},
+    ).sort("timestamp", -1).limit(6).to_list(length=6)
+    for msg in reversed(raw_msgs):  # oldest first
+        history.append({"role": "user", "content": msg["query"]})
+        history.append({"role": "assistant", "content": msg["answer"]})
+
     return StreamingResponse(
-        _sse_generator(query, direct_rag, str(current_user.id), sid),
+        _sse_generator(query, direct_rag, str(current_user.id), sid, history),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

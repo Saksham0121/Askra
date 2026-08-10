@@ -146,6 +146,7 @@ class Reflector:
         query: str,
         initial_result: ToolResult,
         initial_validation: ValidationResult,
+        history: list[dict] | None = None,
     ):
         """
         Run the reflection retry loop, yielding pipeline events.
@@ -168,7 +169,7 @@ class Reflector:
             )
 
             try:
-                stream = tool.execute_stream(refined_query)
+                stream = tool.execute_stream(refined_query, history=history)
                 retry_result = None
                 
                 # Consume the tool stream and yield chunks upward

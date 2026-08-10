@@ -54,8 +54,8 @@ class OnlinePipeline:
     def _build_context(self, chunks: list[EmbeddedChunk]) -> str:
         return self.context_builder.build(chunks)
 
-    def _build_prompt(self, query: str, context: str) -> str:
-        return self.prompt_builder.build(query=query, context=context)
+    def _build_prompt(self, query: str, context: str, history_block: str = "") -> str:
+        return self.prompt_builder.build(query=query, context=context, history_block=history_block)
 
     def _generate(self, prompt: str) -> str:
         return self.groq_manager.generate(model=self.chat_model, prompt=prompt)

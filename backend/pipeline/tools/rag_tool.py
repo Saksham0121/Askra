@@ -20,9 +20,9 @@ _FALLBACK_PHRASES = (
     "not mentioned in the documents",
 )
 
-_FALLBACK_PROMPT = """You are Askrab, a helpful enterprise assistant.
+_FALLBACK_PROMPT = """You are Askra, a helpful enterprise assistant.
 
-The user asked a question but no relevant information was found in the indexed documents.
+{history_block}The user asked a question but no relevant information was found in the indexed documents.
 Answer using your own general knowledge and clearly state that the answer is not from the documents.
 
 IMPORTANT: Start your answer with this exact phrase:
@@ -31,6 +31,16 @@ IMPORTANT: Start your answer with this exact phrase:
 Question: {query}
 
 Answer:"""
+
+
+def _build_history_block(history: list[dict]) -> str:
+    if not history:
+        return ""
+    lines = ["Conversation so far:"]
+    for msg in history[-10:]:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        lines.append(f"{role}: {msg['content'][:500]}")
+    return "\n".join(lines) + "\n\n"
 
 
 class RAGTool(BaseTool):
@@ -61,8 +71,9 @@ class RAGTool(BaseTool):
         logger.info(f"RAGTool completed with {len(sources)} source(s).")
         return ToolResult(answer=answer, answer_source=AnswerSource.RAG, sources=sources, context=context)
 
-    def execute_stream(self, query: str):
+    def execute_stream(self, query: str, history: list[dict] | None = None):
         logger.info(f"RAGTool execute_stream for query: {query!r}")
+        history_block = _build_history_block(history or [])
 
         yield {"type": "status", "message": "🔍 Scanning document index..."}
         raw_chunks = self.online_pipeline.retrieve_candidates(query)
@@ -73,7 +84,7 @@ class RAGTool(BaseTool):
 
         yield {"type": "status", "message": "📖 Reading key sections from your documents..."}
         context = self.online_pipeline._build_context(chunks)
-        prompt = self.online_pipeline._build_prompt(query, context)
+        prompt = self.online_pipeline._build_prompt(query, context, history_block=history_block)
 
         yield {"type": "status", "message": "✍️ Drafting your answer..."}
         stream = self.online_pipeline.groq_manager.generate_stream(
@@ -84,7 +95,7 @@ class RAGTool(BaseTool):
         if self._is_fallback(answer, chunks):
             logger.info("RAGTool: fallback detected. Generating fallback now.")
             yield {"type": "status", "message": "💡 No relevant doc found — drawing on general knowledge..."}
-            prompt = _FALLBACK_PROMPT.format(query=query)
+            prompt = _FALLBACK_PROMPT.format(query=query, history_block=history_block)
             fallback_stream = self.groq_manager.generate_stream(model=self.fallback_model, prompt=prompt)
             answer = "".join(fallback_stream)
             yield {"type": "result", "data": ToolResult(

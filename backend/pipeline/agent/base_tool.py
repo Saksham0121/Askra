@@ -50,7 +50,7 @@ class BaseTool(ABC):
 
     @abstractmethod
     # Executes the tool and streams output events.
-    def execute_stream(self, query: str):
+    def execute_stream(self, query: str, history: list[dict] | None = None):
         """
         Execute the tool for the given query and stream the output.
         

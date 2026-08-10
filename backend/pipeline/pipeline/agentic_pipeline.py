@@ -147,9 +147,10 @@ class AgenticPipeline:
         )
         return result
 
-    def run_stream(self, query: str, direct_rag: bool = False):
+    def run_stream(self, query: str, direct_rag: bool = False, history: list[dict] | None = None):
         start = time.perf_counter()
         logger.info(f"AgenticPipeline.run_stream | direct_rag={direct_rag} | query={query!r}")
+        history = history or []
 
         yield {"type": "status", "message": "🛡️ Checking safety guidelines..."}
         guard = self.guardrail.validate(query)
@@ -164,7 +165,7 @@ class AgenticPipeline:
 
         if guard.intent in _REWRITE_INTENTS or direct_rag:
             yield {"type": "status", "message": "✏️ Refining your query..."}
-            rewrite = self.query_rewriter.rewrite(normalized_query)
+            rewrite = self.query_rewriter.rewrite(normalized_query, history=history)
             normalized_query = rewrite.rewritten_query
 
         if direct_rag:
@@ -175,7 +176,7 @@ class AgenticPipeline:
             tool = self._tool_map.get(tool_name, self.rag_tool)
 
         try:
-            stream = tool.execute_stream(normalized_query)
+            stream = tool.execute_stream(normalized_query, history=history)
             tool_result = None
             for event in stream:
                 if event["type"] == "result":
@@ -208,6 +209,7 @@ class AgenticPipeline:
             reflect_events = self.reflector.reflect_stream(
                 tool=tool, query=normalized_query,
                 initial_result=tool_result, initial_validation=validation,
+                history=history,
             )
             try:
                 while True:

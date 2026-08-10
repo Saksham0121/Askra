@@ -67,11 +67,19 @@ class PipelineBridge:
             index_path=os.path.join(faiss_dir, "index.faiss"),
             metadata_path=os.path.join(faiss_dir, "metadata.json"),
         )
+        try:
+            self._faiss.load()
+        except Exception as exc:
+            logger.warning(f"Failed to load FAISS index on startup: {exc}")
 
         # ── BM25 sparse retriever ────────────────────────────────────────
         self._bm25 = BM25Manager(
             index_path=os.path.join(faiss_dir, "bm25.pkl")
         )
+        try:
+            self._bm25.load()
+        except Exception as exc:
+            logger.warning(f"Failed to load BM25 index on startup: {exc}")
 
         # ── Hybrid retriever ─────────────────────────────────────────────
         dense_retriever = DenseRetriever(
@@ -185,8 +193,8 @@ class PipelineBridge:
     def run(self, query: str, direct_rag: bool = False) -> PipelineResult:
         return self._pipeline.run(query, direct_rag=direct_rag)
 
-    def run_stream(self, query: str, direct_rag: bool = False):
-        return self._pipeline.run_stream(query, direct_rag=direct_rag)
+    def run_stream(self, query: str, direct_rag: bool = False, history: list[dict] | None = None):
+        return self._pipeline.run_stream(query, direct_rag=direct_rag, history=history or [])
 
 
 _bridge_instance: PipelineBridge | None = None

@@ -16,15 +16,16 @@ class PromptBuilder:
         self,
         query: str,
         context: str,
+        history_block: str = "",
     ) -> str:
         """
         Build the final LLM prompt.
         """
 
         return f"""
-You are an enterprise legal AI assistant.
+You are Askra, an enterprise AI assistant.
 
-Answer ONLY using the provided context.
+{history_block}Answer ONLY using the provided context.
 
 If the answer cannot be found in the context, reply with:
 
