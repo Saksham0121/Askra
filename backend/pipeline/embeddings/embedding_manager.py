@@ -55,7 +55,11 @@ class EmbeddingManager:
     def dimension(self) -> int:
         """
         Return the embedding dimension of the model.
+        Defers model loading if the dimension is known.
         """
+        if self._model is None:
+            if "MiniLM-L6" in self.model_name:
+                return 384
         if hasattr(self.model, "get_embedding_dimension"):
             return self.model.get_embedding_dimension()
         return self.model.get_sentence_embedding_dimension()

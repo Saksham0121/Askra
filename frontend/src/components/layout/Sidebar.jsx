@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../api/client';
 import {
   MessageSquare, FileText, BarChart2, Shield,
-  LogOut, Plus, PanelLeft, Clock, Trash2
+  LogOut, Plus, PanelLeft, Clock, Trash2, X
 } from 'lucide-react';
 
 const NAV = [
@@ -83,6 +83,9 @@ export default function Sidebar({ isCollapsed, toggleSidebar, closeMobileSidebar
         </div>
         <button className="sidebar-toggle-btn" onClick={toggleSidebar} title="Toggle Sidebar">
           <PanelLeft size={18} />
+        </button>
+        <button className="sidebar-close-btn" onClick={closeMobileSidebar} title="Close Menu">
+          <X size={18} />
         </button>
       </div>
 

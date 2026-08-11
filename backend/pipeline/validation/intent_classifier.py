@@ -117,6 +117,13 @@ class IntentClassifier:
         "variable", "object", "array", "string", "integer", "null", "pointer",
     }
 
+    OCR_KEYWORDS = {
+        "scan", "ocr", "extract text from image", "read this image",
+        "parse this image", "scan this document", "scan this pdf",
+        "scan the document", "scan the pdf", "scan the image",
+        "image to text", "scanned", "handwritten",
+    }
+
     # -----------------------------------------------------------------------
     # Hard-block phrase list (instant JAILBREAK, no scoring)
     # -----------------------------------------------------------------------
@@ -237,6 +244,10 @@ class IntentClassifier:
 
         if _has_word(self.GREETINGS):
             return QueryIntent.GREETING
+
+        # OCR detection — check before CODE/DOCUMENT to avoid false matches
+        if _has_word(self.OCR_KEYWORDS):
+            return QueryIntent.OCR_SCAN
 
         # CODE before DOCUMENT: avoids "act" in "react" triggering DOCUMENT
         if _has_word(self.CODE_KEYWORDS):

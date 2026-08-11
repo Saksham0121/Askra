@@ -1,8 +1,16 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+const RAW_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = RAW_URL.replace(/\/+$/, '');
+
+export function buildApiUrl(path) {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${cleanPath}`;
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   timeout: 30000,
 });
 
@@ -23,7 +31,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = useAuthStore.getState().refreshToken;
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/refresh`,
+          buildApiUrl('/auth/refresh'),
           { refresh_token: refreshToken }
         );
         useAuthStore.getState().setTokens(data.access_token, data.refresh_token);

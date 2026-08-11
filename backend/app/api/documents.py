@@ -18,7 +18,9 @@ from app.auth.rbac import PolicyEngine, Action, require_permission, AccessScope
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
+_MIN_CHARS_PER_PAGE = 50  # if PyMuPDF extracts fewer, the PDF is likely scanned
 
 
 def _allowed(filename: str) -> bool:
@@ -30,6 +32,7 @@ async def upload_document(
     file: UploadFile = File(...),
     department: str = Form("general"),
     description: str = Form(""),
+    use_ocr: bool = Form(False),
     current_user: UserInDB = Depends(require_permission(Action.DOCUMENT_UPLOAD)),
 ):
     if not _allowed(file.filename or ""):
@@ -74,9 +77,58 @@ async def upload_document(
         chunker = ChunkingService()
 
         ext = dest.suffix.lower()
-        if ext == '.pdf':
+
+        # Determine whether to use OCR
+        should_ocr = use_ocr or (ext in _IMAGE_EXTENSIONS)
+
+        if should_ocr and bridge.ocr_service is not None:
+            # ── OCR path (images + scanned PDFs) ──
+            from pipeline.ingestion.ocr_document_loader import OCRDocumentLoader
+            ocr_loader = OCRDocumentLoader(bridge.ocr_service)
+
+            if ext in _IMAGE_EXTENSIONS or ext == '.pdf':
+                try:
+                    doc_content = ocr_loader.load(str(dest))
+                except Exception as ocr_err:
+                    # Fall back to standard loader for PDFs
+                    if ext == '.pdf':
+                        loader = PDFDocumentLoader()
+                        doc_content = loader.load(str(dest))
+                    else:
+                        raise ocr_err
+            else:
+                with open(dest, 'r', encoding='utf-8', errors='ignore') as f:
+                    raw_text = f.read()
+                doc_content = DocumentContent(
+                    metadata=DocumentMetadata(
+                        title=file.filename,
+                        author=None,
+                        subject=None,
+                        keywords=[],
+                        publication_date=None,
+                        effective_date=None,
+                        version=None,
+                        language="en"
+                    ),
+                    pages=[PageContent(page_number=1, text=raw_text)]
+                )
+        elif ext == '.pdf':
+            # ── Standard PDF path ──
             loader = PDFDocumentLoader()
             doc_content = loader.load(str(dest))
+
+            # Auto-detect scanned PDFs: if text extraction yields very little
+            # text per page, try OCR automatically
+            if bridge.ocr_service is not None and bridge.ocr_service.is_available():
+                total_chars = sum(len(p.text.strip()) for p in doc_content.pages)
+                avg_chars = total_chars / max(len(doc_content.pages), 1)
+                if avg_chars < _MIN_CHARS_PER_PAGE:
+                    from pipeline.ingestion.ocr_document_loader import OCRDocumentLoader
+                    ocr_loader = OCRDocumentLoader(bridge.ocr_service)
+                    try:
+                        doc_content = ocr_loader.load(str(dest))
+                    except Exception:
+                        pass  # keep the standard extraction
         else:
             with open(dest, 'r', encoding='utf-8', errors='ignore') as f:
                 raw_text = f.read()

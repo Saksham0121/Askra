@@ -29,6 +29,8 @@ class QueryIntent(str, Enum):
 
     JAILBREAK = "jailbreak"
 
+    OCR_SCAN = "ocr_scan"
+
     UNKNOWN = "unknown"
 
 

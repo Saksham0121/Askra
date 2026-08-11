@@ -18,10 +18,12 @@ Tools:
 - "rag"  : Questions about uploaded documents, internal policies, contracts, legal acts, reports, or domain-specific private data.
 - "chat" : General knowledge (history, sports, science, geography, news), greetings, or anything answerable without private documents.
 - "code" : Programming, scripting, debugging, algorithms, or software questions.
+- "ocr"  : Scanning images or PDFs to extract text, OCR requests, reading handwritten or scanned documents.
 
 Rules:
-1. Reply with ONLY one word: rag, chat, or code — no punctuation, no explanation.
+1. Reply with ONLY one word: rag, chat, code, or ocr — no punctuation, no explanation.
 2. If the query mentions topics clearly unrelated to documents (sports, general facts, public figures), choose chat.
+3. If the query asks to scan, OCR, or extract text from an image or scanned document, choose ocr.
 
 User query: {query}
 
@@ -32,13 +34,14 @@ _INTENT_TO_TOOL: dict[QueryIntent, str] = {
     QueryIntent.GENERAL_CHAT: "chat",
     QueryIntent.CODE: "code",
     QueryIntent.DOCUMENT: "rag",
+    QueryIntent.OCR_SCAN: "ocr",
 }
 
 
 class AgentRouter:
     """Hybrid router: rule-based first, Groq LLM fallback for ambiguous queries."""
 
-    VALID_TOOLS = {"rag", "chat", "code"}
+    VALID_TOOLS = {"rag", "chat", "code", "ocr"}
 
     def __init__(self, groq_manager: GroqManager, model: str) -> None:
         self.groq_manager = groq_manager
@@ -67,7 +70,7 @@ class AgentRouter:
 
     def _parse_tool(self, raw: str) -> str:
         cleaned = raw.strip().lower()
-        for tool in ("chat", "code", "rag"):
+        for tool in ("chat", "code", "rag", "ocr"):
             if re.search(rf"\b{tool}\b", cleaned):
                 return tool
         logger.warning(f"AgentRouter could not parse tool from: {raw!r}, defaulting to 'rag'.")

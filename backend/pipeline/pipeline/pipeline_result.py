@@ -20,6 +20,7 @@ class AnswerSource:
     LLM        = "llm"           # chat tool / LLM own knowledge
     CODE       = "code"          # code tool / LLM own knowledge
     RAG_FALLBACK = "rag_fallback"  # RAG tried but fell back to LLM
+    OCR          = "ocr"            # OCR scan of image/PDF
 
 
 # ---------------------------------------------------------------------------
@@ -52,6 +53,7 @@ def answer_source_label(source: str) -> str:
         AnswerSource.LLM:          "🤖 LLM answer (own knowledge)",
         AnswerSource.CODE:         "💻 Code answer (own knowledge)",
         AnswerSource.RAG_FALLBACK: "⚠️ RAG fallback — LLM answered from general knowledge",
+        AnswerSource.OCR:          "🔍 OCR scan (Unlimited-OCR)",
     }.get(source, "❓ Unknown source")
 
 

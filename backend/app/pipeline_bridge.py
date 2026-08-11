@@ -29,6 +29,8 @@ from pipeline.retrieval.hybrid_retriever import HybridRetriever
 from pipeline.tools.chat_tool import ChatTool
 from pipeline.tools.code_tool import CodeTool
 from pipeline.tools.rag_tool import RAGTool
+from pipeline.tools.ocr_tool import OCRTool
+from pipeline.services.ocr_service import OCRService
 from pipeline.validation.guardrail import Guardrail
 from pipeline.validation.query_rewriter import QueryRewriter
 from pipeline.validation.validation_layer import ValidationLayer
@@ -160,7 +162,26 @@ class PipelineBridge:
             model=settings.groq_router_model,
         )
 
-        # ── Agentic pipeline ─────────────────────────────────────────────
+        # ── OCR service + tool ──────────────────────────────────────────────
+        self._ocr_service: OCRService | None = None
+        self._ocr_tool: OCRTool | None = None
+
+        if settings.ocr_enabled:
+            self._ocr_service = OCRService(
+                server_url=settings.ocr_server_url,
+            )
+            self._ocr_tool = OCRTool(
+                ocr_service=self._ocr_service,
+                upload_dir=settings.upload_dir,
+            )
+            logger.info(
+                f"OCR service initialized (server: {settings.ocr_server_url}, "
+                f"available: {self._ocr_service.is_available()})"
+            )
+        else:
+            logger.info("OCR is disabled (OCR_ENABLED=false).")
+
+        # ── Agentic pipeline ───────────────────────────────────────────────
         self._pipeline = AgenticPipeline(
             guardrail=self._guardrail,
             router=self._router,
@@ -170,6 +191,7 @@ class PipelineBridge:
             validator=self._validator,
             reflector=self._reflector,
             query_rewriter=self._query_rewriter,
+            ocr_tool=self._ocr_tool,
         )
 
         logger.info("PipelineBridge initialized successfully.")
@@ -189,6 +211,10 @@ class PipelineBridge:
     @property
     def bm25_manager(self) -> BM25Manager:
         return self._bm25
+
+    @property
+    def ocr_service(self) -> OCRService | None:
+        return self._ocr_service
 
     def run(self, query: str, direct_rag: bool = False) -> PipelineResult:
         return self._pipeline.run(query, direct_rag=direct_rag)

@@ -12,6 +12,7 @@ from pipeline.reflection.reflector import Reflector
 from pipeline.tools.chat_tool import ChatTool
 from pipeline.tools.code_tool import CodeTool
 from pipeline.tools.rag_tool import RAGTool
+from pipeline.tools.ocr_tool import OCRTool
 from pipeline.validation.guardrail import Guardrail
 from pipeline.validation.models import QueryIntent
 from pipeline.validation.query_rewriter import QueryRewriter
@@ -21,7 +22,7 @@ from pipeline.core.logging import LoggerManager
 logger = LoggerManager.get_logger()
 
 _REWRITE_INTENTS: frozenset[QueryIntent] = frozenset({QueryIntent.DOCUMENT, QueryIntent.UNKNOWN})
-_NO_VALIDATE_TOOLS: frozenset[str] = frozenset({"chat", "code"})
+_NO_VALIDATE_TOOLS: frozenset[str] = frozenset({"chat", "code", "ocr"})
 
 
 def _fast_path_validation(tool_name: str = "rag") -> ValidationResult:
@@ -53,12 +54,14 @@ class AgenticPipeline:
         validator: ValidationLayer,
         reflector: Reflector,
         query_rewriter: QueryRewriter,
+        ocr_tool: OCRTool | None = None,
     ) -> None:
         self.guardrail = guardrail
         self.router = router
         self.chat_tool = chat_tool
         self.code_tool = code_tool
         self.rag_tool = rag_tool
+        self.ocr_tool = ocr_tool
         self.validator = validator
         self.reflector = reflector
         self.query_rewriter = query_rewriter
@@ -67,6 +70,8 @@ class AgenticPipeline:
             "code": code_tool,
             "rag": rag_tool,
         }
+        if ocr_tool is not None:
+            self._tool_map["ocr"] = ocr_tool
 
     def run(self, query: str, direct_rag: bool = False) -> PipelineResult:
         start = time.perf_counter()

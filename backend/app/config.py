@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     hallucination_threshold: float = 0.3
     confidence_threshold: float = 5.5
 
+    # ── OCR (Unlimited-OCR via SGLang) ─────────────────────────────────
+    ocr_server_url: str = "http://127.0.0.1:10000"
+    ocr_enabled: bool = True
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

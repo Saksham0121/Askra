@@ -7,9 +7,7 @@ import {
   ArrowUp, ShieldAlert, Cpu, Menu
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import api from '../api/client';
-
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import api, { buildApiUrl } from '../api/client';
 
 const PIPELINE_LAYERS = [
   { id: 'L0', label: 'L0 · Safety Guardrail' },
@@ -66,8 +64,9 @@ const PROMPT_SUGGESTIONS = [
   }
 ];
 
-export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
-  const { accessToken } = useAuthStore();
+export default function ChatWindow({ activeSessionId, toggleMobileSidebar, onSelectSession, onNewChat }) {
+  const { user, accessToken } = useAuthStore();
+  const userFirstName = user?.full_name?.split(' ')[0] || '';
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -94,7 +93,7 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
 
   useEffect(() => {
     // When session changes: load history or clear for new chat
-    if (activeSessionId === sessionId) return;
+    if (activeSessionId === sessionId && activeSessionId !== null) return;
     setSessionId(activeSessionId);
     setMessages([]);
     setIsStreaming(false);
@@ -211,7 +210,8 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
     const params = new URLSearchParams({ query, direct_rag: currentDirectRag });
     if (sessionId) params.append('session_id', sessionId);
 
-    const es = new EventSource(`${BASE}/api/chat/stream?${params}&_token=${accessToken}`);
+    const streamUrl = buildApiUrl(`/api/chat/stream?${params}&_token=${accessToken}`);
+    const es = new EventSource(streamUrl);
     esRef.current = es;
 
     es.onmessage = (e) => {
@@ -226,7 +226,10 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
             setDoneLayerIds(PIPELINE_LAYERS.slice(0, idx).map(l => l.id));
           }
         } else if (event.type === 'result') {
-          if (event.session_id) setSessionId(event.session_id);
+          if (event.session_id) {
+            setSessionId(event.session_id);
+            onSelectSession?.(event.session_id);
+          }
           setDoneLayerIds(PIPELINE_LAYERS.map(l => l.id));
           setActiveLayer(null);
           setStatusMsg('');
@@ -377,7 +380,9 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar }) {
             {messages.length === 0 ? (
               /* ChatGPT Initial Screen View */
               <div className="gpt-empty-screen">
-                <div className="empty-title">Where should we begin?</div>
+                <div className="empty-title">
+                  {userFirstName ? `How can I help, ${userFirstName}?` : 'How can I help you today?'}
+                </div>
                 <div className="empty-sub">
                   Powered by 7-Layer Agentic RAG Architecture & Groq LLM
                 </div>

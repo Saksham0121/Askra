@@ -3,8 +3,9 @@ Askrab — FastAPI Application Entry Point.
 """
 from __future__ import annotations
 import logging
+import re
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import close_connection
@@ -14,6 +15,7 @@ from app.api.chat import router as chat_router
 from app.api.documents import router as documents_router
 from app.api.analytics import router as analytics_router
 from app.api.admin import router as admin_router
+from app.api.ocr import router as ocr_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("askrab")
@@ -60,15 +62,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def path_sanitization_middleware(request: Request, call_next):
+    raw_path = request.scope.get("path", "")
+    if "//" in raw_path:
+        normalized_path = "/" + "/".join(segment for segment in raw_path.split("/") if segment)
+        request.scope["path"] = normalized_path
+    return await call_next(request)
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(analytics_router)
 app.include_router(admin_router)
+app.include_router(ocr_router)
 
 
 @app.get("/", tags=["health"])
+@app.head("/", tags=["health"])
 async def root():
     return {
         "name": "Askrab API",
@@ -79,5 +91,6 @@ async def root():
 
 
 @app.get("/health", tags=["health"])
+@app.head("/health", tags=["health"])
 async def health():
     return {"status": "ok"}

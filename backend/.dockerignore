@@ -1,0 +1,26 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Data & temporary stores
+uploads/*
+!uploads/.gitkeep
+faiss_store/*
+!faiss_store/.gitkeep
+*.log
+
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store

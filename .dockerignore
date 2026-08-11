@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+*.log
+backend/.venv
+backend/__pycache__
+frontend/node_modules
+frontend/dist
+OCR_tool/wheel
+OCR_tool/assets

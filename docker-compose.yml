@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # ── MongoDB Database ──────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: askra-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: askrab
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend & Agentic Pipeline ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: askra-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=askrab
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_CHAT_MODEL=llama-3.1-8b-instant
+      - GROQ_CODE_MODEL=llama-3.1-8b-instant
+      - GROQ_ROUTER_MODEL=llama-3.1-8b-instant
+      - GROQ_REWRITER_MODEL=llama-3.1-8b-instant
+      - JWT_SECRET=${JWT_SECRET:-askrab-super-secret-jwt-key-change-in-production}
+      - APP_ENV=production
+      - CORS_ORIGINS=http://localhost,http://localhost:5173,http://localhost:80
+      - UPLOAD_DIR=/app/uploads
+      - FAISS_INDEX_DIR=/app/faiss_store
+      - OCR_SERVER_URL=http://host.docker.internal:10000
+      - OCR_ENABLED=true
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_faiss:/app/faiss_store
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # ── React Frontend & Nginx Reverse Proxy ──────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: askra-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+    driver: local
+  backend_uploads:
+    driver: local
+  backend_faiss:
+    driver: local
