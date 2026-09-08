@@ -83,7 +83,7 @@ app.include_router(ocr_router)
 @app.head("/", tags=["health"])
 async def root():
     return {
-        "name": "Askrab API",
+        "name": "Askra API",
         "version": "1.0.0",
         "status": "running",
         "pipeline": "7-layer agentic RAG",

@@ -125,5 +125,5 @@ class RAGTool(BaseTool):
     def _generate_fallback(self, query: str) -> str:
         return self.llm_manager.generate(
             model=self.fallback_model,
-            prompt=_FALLBACK_PROMPT.format(query=query),
+            prompt=_FALLBACK_PROMPT.format(query=query, history_block=""),
         )
