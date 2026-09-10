@@ -50,3 +50,40 @@ def messages_collection():
 
 def analytics_collection():
     return get_db()["analytics"]
+
+
+async def init_indexes() -> None:
+    """
+    Ensure all required compound and unique indexes exist on MongoDB collections.
+    Prevents full collection scans during frequent conversation queries and RBAC checks.
+    """
+    from pymongo import ASCENDING, DESCENDING, IndexModel
+
+    db = get_db()
+
+    # 1. messages: (session_id, timestamp) for session history, (user_id, timestamp) for user history
+    await db["messages"].create_indexes([
+        IndexModel([("session_id", ASCENDING), ("timestamp", DESCENDING)], name="idx_session_timestamp"),
+        IndexModel([("user_id", ASCENDING), ("timestamp", DESCENDING)], name="idx_user_timestamp"),
+    ])
+
+    # 2. chat_sessions: (user_id, updated_at) for session list sorted by latest activity
+    await db["chat_sessions"].create_indexes([
+        IndexModel([("user_id", ASCENDING), ("updated_at", DESCENDING)], name="idx_user_updated"),
+    ])
+
+    # 3. documents: (department, created_at) for department-scoped RBAC document listing
+    await db["documents"].create_indexes([
+        IndexModel([("department", ASCENDING), ("created_at", DESCENDING)], name="idx_dept_created"),
+    ])
+
+    # 4. users: unique email
+    await db["users"].create_indexes([
+        IndexModel([("email", ASCENDING)], unique=True, name="idx_user_email_unique"),
+    ])
+
+    # 5. analytics: (event, timestamp) for analytics aggregation and query trend charts
+    await db["analytics"].create_indexes([
+        IndexModel([("event", ASCENDING), ("timestamp", DESCENDING)], name="idx_event_timestamp"),
+    ])
+

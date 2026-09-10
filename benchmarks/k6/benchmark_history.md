@@ -18,12 +18,13 @@ This document records the exact performance metrics of Askra at every stage of o
 
 ## 🏆 Master Comparison Table (Single User Smoke Test)
 
-| Stage | Optimization Applied | HTTP Error Rate | Checks Passed | P95 Latency | TTFT / TTFB (P95) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Stage 0 (Baseline)** | *None (Unoptimized)* | **0.00%** | **100.0%** | **419.2ms** | **124.6ms** |
-| **Stage 1** | *Pending* | — | — | — | — |
-| **Stage 2** | *Pending* | — | — | — | — |
-| **Stage 3** | *Pending* | — | — | — | — |
+| Stage | Optimization Applied | HTTP Error Rate | Checks Passed | P95 Latency | TTFT / TTFB (P95) | Improvement (TTFT) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Stage 0 (Baseline)** | *None (Unoptimized)* | **0.00%** | **100.0%** | **419.2ms** | **124.6ms** | Baseline |
+| **Stage 1** | **MongoDB Compound Indexes** | **0.00%** | **100.0%** | **439.7ms** | **103.3ms** | **⚡ 17.1% faster TTFT** (COLLSCAN → IXSCAN) |
+| **Stage 2** | *Pending* | — | — | — | — | — |
+| **Stage 3** | *Pending* | — | — | — | — | — |
+
 
 ---
 
@@ -64,4 +65,39 @@ successful_queries.............: 5 completed
 * **Bottleneck Diagnosis**: Synchronous blocking pipeline calls (`bridge.run()` & `bridge.run_stream()`) executing directly on FastAPI's main asyncio event loop, starving all concurrent requests in the socket backlog.
 
 ---
+
+### Run 1: MongoDB Compound Indexes
+* **Date & Time**: `2026-10-06 18:43:28`
+* **Changes**:
+  - Added compound index `(session_id: 1, timestamp: -1)` on `messages`
+  - Added compound index `(user_id: 1, timestamp: -1)` on `messages`
+  - Added compound index `(user_id: 1, updated_at: -1)` on `chat_sessions`
+  - Added compound index `(department: 1, created_at: -1)` on `documents`
+  - Added unique index `(email: 1)` on `users`
+  - Added compound index `(event: 1, timestamp: -1)` on `analytics`
+  - Wired automated startup initialization via `init_indexes()` in `app/main.py` lifespan
+* **Verification via MongoDB Explain Plan**:
+  - `messages` query execution stage: `COLLSCAN` ➔ **`IXSCAN`** (Index Scan)
+  - `chat_sessions` query execution stage: `COLLSCAN` ➔ **`IXSCAN`** (Index Scan)
+  - `documents` query execution stage: `COLLSCAN` ➔ **`IXSCAN`** (Index Scan)
+
+#### 1. Smoke Test (1 VU, 15s)
+```text
+✓ health status 200
+✓ chat POST status 200
+✓ chat has answer
+✓ stream GET status 200
+✓ stream has data chunks
+
+checks_succeeded...............: 100.00% (45 / 45)
+http_req_failed................: 0.00%   (0 / 28)
+http_req_duration (p50)........: 295.43ms
+http_req_duration (p95)........: 439.70ms
+chat_stream_ttfb_ms (avg)......: 94.52ms  (⚡ 14.6% faster than baseline 110.72ms)
+chat_stream_ttfb_ms (p95)......: 103.32ms (⚡ 17.1% faster than baseline 124.60ms)
+throughput.....................: 1.80 req/s
+```
+
+---
 *(Additional runs will be appended below as optimizations are implemented)*
+

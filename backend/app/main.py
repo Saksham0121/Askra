@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.database import close_connection
+from app.database import close_connection, init_indexes
 from app.pipeline_bridge import get_pipeline_bridge
 from app.auth.router import router as auth_router
 from app.api.chat import router as chat_router
@@ -27,6 +27,13 @@ async def lifespan(app: FastAPI):
     logger.info("Askrab starting up...")
     settings = get_settings()
     logger.info(f"Environment: {settings.app_env}")
+
+    # Ensure optimal MongoDB compound indexes exist
+    try:
+        await init_indexes()
+        logger.info("MongoDB compound indexes verified successfully.")
+    except Exception as exc:
+        logger.error(f"Failed to initialize MongoDB indexes: {exc}")
 
     # Warm up the pipeline (loads embedding model, FAISS index, Groq client)
     try:

@@ -30,26 +30,28 @@ export const options = {
 export function setup() {
   console.log(`Setting up benchmark against ${BASE_URL}...`);
 
-  // 1. Ensure benchmark user is registered
-  const userPayload = JSON.stringify({
+  const loginPayload = JSON.stringify({
     email: 'k6_benchmark@askra.ai',
     password: 'BenchmarkPassword123!',
-    full_name: 'k6 Runner',
-    department: 'engineering',
-    role: 'employee',
   });
 
-  http.post(`${BASE_URL}/auth/register`, userPayload, {
+  let loginRes = http.post(`${BASE_URL}/auth/login`, loginPayload, {
     headers: { 'Content-Type': 'application/json' },
   });
 
-  // 2. Authenticate
-  const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
-    email: 'k6_benchmark@askra.ai',
-    password: 'BenchmarkPassword123!',
-  }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  if (loginRes.status !== 200) {
+    http.post(`${BASE_URL}/auth/register`, JSON.stringify({
+      email: 'k6_benchmark@askra.ai',
+      password: 'BenchmarkPassword123!',
+      full_name: 'k6 Runner',
+      department: 'engineering',
+      role: 'employee',
+    }), { headers: { 'Content-Type': 'application/json' } });
+
+    loginRes = http.post(`${BASE_URL}/auth/login`, loginPayload, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const token = loginRes.json('access_token');
   if (!token) {
@@ -59,6 +61,7 @@ export function setup() {
   console.log('Setup complete: JWT token obtained successfully.');
   return { token };
 }
+
 
 export default function (data) {
   const authHeaders = {

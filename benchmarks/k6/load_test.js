@@ -53,25 +53,34 @@ const SAMPLE_QUERIES = [
 export function setup() {
   console.log(`[k6 Setup] Authenticating benchmark user at ${BASE_URL}...`);
 
-  // Auto-register benchmark user (ignore 409 if already exists)
-  http.post(`${BASE_URL}/auth/register`, JSON.stringify({
+  const loginPayload = JSON.stringify({
     email: 'k6_loadtester@askra.ai',
     password: 'LoadTester123!',
-    full_name: 'k6 Load Tester',
-    department: 'engineering',
-    role: 'employee',
-  }), { headers: { 'Content-Type': 'application/json' } });
+  });
 
-  // Authenticate
-  const loginRes = http.post(`${BASE_URL}/auth/login`, JSON.stringify({
-    email: 'k6_loadtester@askra.ai',
-    password: 'LoadTester123!',
-  }), { headers: { 'Content-Type': 'application/json' } });
+  let loginRes = http.post(`${BASE_URL}/auth/login`, loginPayload, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (loginRes.status !== 200) {
+    http.post(`${BASE_URL}/auth/register`, JSON.stringify({
+      email: 'k6_loadtester@askra.ai',
+      password: 'LoadTester123!',
+      full_name: 'k6 Load Tester',
+      department: 'engineering',
+      role: 'employee',
+    }), { headers: { 'Content-Type': 'application/json' } });
+
+    loginRes = http.post(`${BASE_URL}/auth/login`, loginPayload, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const token = loginRes.json('access_token');
   if (!token) {
     throw new Error(`k6 setup failed to authenticate: ${loginRes.body}`);
   }
+
 
   console.log('[k6 Setup] Setup completed successfully.');
   return { token };
