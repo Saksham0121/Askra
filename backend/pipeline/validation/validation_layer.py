@@ -1,12 +1,12 @@
 """
-ValidationLayer and QueryRewriter adapted for GroqManager.
+ValidationLayer and QueryRewriter adapted for CustomLLMManager.
 """
 from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 
 logger = LoggerManager.get_logger()
 
@@ -52,12 +52,12 @@ class ValidationLayer:
 
     def __init__(
         self,
-        groq_manager: GroqManager,
+        llm_manager: CustomLLMManager,
         model: str,
         threshold: float = DEFAULT_THRESHOLD,
         weights: dict | None = None,
     ) -> None:
-        self.groq_manager = groq_manager
+        self.llm_manager = llm_manager
         self.model = model
         self.threshold = threshold
         self.weights = weights or {"correctness": 0.5, "completeness": 0.3, "citations": 0.2}
@@ -70,7 +70,7 @@ class ValidationLayer:
             answer=answer,
         )
         try:
-            raw = self.groq_manager.generate(model=self.model, prompt=prompt)
+            raw = self.llm_manager.generate(model=self.model, prompt=prompt)
             scores = self._parse_json(raw)
         except Exception as exc:
             logger.warning(f"ValidationLayer LLM call failed ({exc}). Using default scores.")

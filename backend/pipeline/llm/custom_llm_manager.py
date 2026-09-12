@@ -1,7 +1,7 @@
 """
 Custom LLM Manager.
 
-Drop-in replacement for GroqManager, targeting any OpenAI-compatible
+Drop-in replacement for CustomLLMManager, targeting any OpenAI-compatible
 /v1/chat/completions endpoint (e.g. a self-hosted vLLM / llama.cpp server).
 
 Exposes the same interface:
@@ -42,7 +42,7 @@ class CustomLLMManager:
         )
 
     # ------------------------------------------------------------------
-    # Public API (mirrors GroqManager / OllamaManager)
+    # Public API (mirrors CustomLLMManager / OllamaManager)
     # ------------------------------------------------------------------
 
     def generate(self, model: str, prompt: str, max_tokens: int = 2048) -> str:

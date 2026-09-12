@@ -46,7 +46,7 @@ class StartupService:
 
         self.config = ApplicationConfig()
 
-        from pipeline.llm.groq_manager import GroqManager
+        from pipeline.llm.custom_llm_manager import CustomLLMManager
 
         ollama = OllamaManager()
 

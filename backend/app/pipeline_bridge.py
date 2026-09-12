@@ -2,7 +2,7 @@
 Pipeline Bridge.
 
 Creates and wires the full AgenticPipeline using CustomLLMManager
-(self-hosted OpenAI-compatible endpoint) instead of GroqManager.
+(self-hosted OpenAI-compatible endpoint) instead of CustomLLMManager.
 This is the single entry point for FastAPI endpoints to interact with the pipeline.
 """
 
@@ -114,30 +114,30 @@ class PipelineBridge:
             reranker=self._reranker,
             context_builder=self._context_builder,
             prompt_builder=self._prompt_builder,
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             chat_model=settings.llm_chat_model,
         )
 
         # ── Tools ────────────────────────────────────────────────────────
         self._chat_tool = ChatTool(
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             model=settings.llm_chat_model,
         )
 
         self._code_tool = CodeTool(
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             model=settings.llm_code_model,
         )
 
         self._rag_tool = RAGTool(
             online_pipeline=self._online_pipeline,
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             fallback_model=settings.llm_chat_model,
         )
 
         # ── Validation layer ─────────────────────────────────────────────
         self._validator = ValidationLayer(
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             model=settings.llm_chat_model,
             threshold=settings.confidence_threshold,
             weights={
@@ -152,7 +152,7 @@ class PipelineBridge:
 
         # ── Query rewriter ───────────────────────────────────────────────
         self._query_rewriter = QueryRewriter(
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             model=settings.llm_rewriter_model,
         )
 
@@ -161,7 +161,7 @@ class PipelineBridge:
 
         # ── Router ───────────────────────────────────────────────────────
         self._router = AgentRouter(
-            groq_manager=self._llm,
+            llm_manager=self._llm,
             model=settings.llm_router_model,
         )
 

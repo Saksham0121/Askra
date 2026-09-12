@@ -8,7 +8,7 @@ from pipeline.context import ContextBuilder
 from pipeline.core.config import ApplicationConfig
 from pipeline.embeddings import EmbeddingManager
 from pipeline.generation import PromptBuilder
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from .online_pipeline import OnlinePipeline
 from pipeline.reranking import CrossEncoderReranker
 from pipeline.retrieval import (
@@ -81,6 +81,6 @@ class PipelineFactory:
             reranker=reranker,
             context_builder=context_builder,
             prompt_builder=prompt_builder,
-            groq_manager=groq_manager,
+            llm_manager=llm_manager,
             config=config,
         )

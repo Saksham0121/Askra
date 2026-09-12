@@ -1,10 +1,10 @@
 """
-RAG Tool — uses GroqManager and OnlinePipeline.
+RAG Tool — uses CustomLLMManager and OnlinePipeline.
 """
 from __future__ import annotations
 from pipeline.agent.base_tool import BaseTool, ToolResult
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from pipeline.models import EmbeddedChunk
 from pipeline.pipeline.online_pipeline import OnlinePipeline
 from pipeline.pipeline.pipeline_result import AnswerSource
@@ -51,11 +51,11 @@ class RAGTool(BaseTool):
     def __init__(
         self,
         online_pipeline: OnlinePipeline,
-        groq_manager: GroqManager,
+        llm_manager: CustomLLMManager,
         fallback_model: str,
     ) -> None:
         self.online_pipeline = online_pipeline
-        self.groq_manager = groq_manager
+        self.llm_manager = llm_manager
         self.fallback_model = fallback_model
 
     def execute(self, query: str) -> ToolResult:
@@ -87,7 +87,7 @@ class RAGTool(BaseTool):
         prompt = self.online_pipeline._build_prompt(query, context, history_block=history_block)
 
         yield {"type": "status", "message": "✍️ Drafting your answer..."}
-        stream = self.online_pipeline.groq_manager.generate_stream(
+        stream = self.online_pipeline.llm_manager.generate_stream(
             model=self.online_pipeline.chat_model, prompt=prompt
         )
         answer = "".join(stream)
@@ -96,7 +96,7 @@ class RAGTool(BaseTool):
             logger.info("RAGTool: fallback detected. Generating fallback now.")
             yield {"type": "status", "message": "💡 No relevant doc found — drawing on general knowledge..."}
             prompt = _FALLBACK_PROMPT.format(query=query, history_block=history_block)
-            fallback_stream = self.groq_manager.generate_stream(model=self.fallback_model, prompt=prompt)
+            fallback_stream = self.llm_manager.generate_stream(model=self.fallback_model, prompt=prompt)
             answer = "".join(fallback_stream)
             yield {"type": "result", "data": ToolResult(
                 answer=answer, answer_source=AnswerSource.RAG_FALLBACK, sources=[], context=""
@@ -123,7 +123,7 @@ class RAGTool(BaseTool):
         return sources
 
     def _generate_fallback(self, query: str) -> str:
-        return self.groq_manager.generate(
+        return self.llm_manager.generate(
             model=self.fallback_model,
             prompt=_FALLBACK_PROMPT.format(query=query),
         )

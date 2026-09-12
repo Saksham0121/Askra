@@ -1,10 +1,10 @@
 """
-Chat Tool — uses GroqManager.
+Chat Tool — uses CustomLLMManager.
 """
 from __future__ import annotations
 from pipeline.agent.base_tool import BaseTool, ToolResult
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from pipeline.pipeline.pipeline_result import AnswerSource
 
 logger = LoggerManager.get_logger()
@@ -35,14 +35,14 @@ class ChatTool(BaseTool):
 
     name = "chat"
 
-    def __init__(self, groq_manager: GroqManager, model: str) -> None:
-        self.groq_manager = groq_manager
+    def __init__(self, llm_manager: CustomLLMManager, model: str) -> None:
+        self.llm_manager = llm_manager
         self.model = model
 
     def execute(self, query: str) -> ToolResult:
         logger.info(f"ChatTool executing for query: {query!r}")
         prompt = _CHAT_PROMPT.format(query=query, history_block="")
-        answer = self.groq_manager.generate(model=self.model, prompt=prompt)
+        answer = self.llm_manager.generate(model=self.model, prompt=prompt)
         answer = answer.strip()
         logger.info("ChatTool completed.")
         return ToolResult(answer=answer, answer_source=AnswerSource.LLM, sources=[], context="")
@@ -52,7 +52,7 @@ class ChatTool(BaseTool):
         yield {"type": "status", "message": "Answering from general knowledge..."}
         history_block = _build_history_block(history or [])
         prompt = _CHAT_PROMPT.format(query=query, history_block=history_block)
-        stream = self.groq_manager.generate_stream(model=self.model, prompt=prompt)
+        stream = self.llm_manager.generate_stream(model=self.model, prompt=prompt)
         answer = "".join(stream).strip()
         logger.info("ChatTool streaming completed.")
         yield {"type": "result", "data": ToolResult(

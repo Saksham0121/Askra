@@ -1,10 +1,10 @@
 """
-QueryRewriter adapted for GroqManager.
+QueryRewriter adapted for CustomLLMManager.
 """
 from __future__ import annotations
 from dataclasses import dataclass
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 
 logger = LoggerManager.get_logger()
 
@@ -34,8 +34,8 @@ class QueryRewriteResult:
 
 
 class QueryRewriter:
-    def __init__(self, groq_manager: GroqManager, model: str) -> None:
-        self._groq = groq_manager
+    def __init__(self, llm_manager: CustomLLMManager, model: str) -> None:
+        self._groq = llm_manager
         self._model = model
 
     def rewrite(self, query: str, history: list[dict] | None = None) -> QueryRewriteResult:

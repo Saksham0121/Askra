@@ -1,10 +1,10 @@
 """
-Agent Router adapted for GroqManager.
+Agent Router adapted for CustomLLMManager.
 """
 from __future__ import annotations
 import re
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from pipeline.validation.intent_classifier import IntentClassifier
 from pipeline.validation.models import QueryIntent
 
@@ -43,8 +43,8 @@ class AgentRouter:
 
     VALID_TOOLS = {"rag", "chat", "code", "ocr"}
 
-    def __init__(self, groq_manager: GroqManager, model: str) -> None:
-        self.groq_manager = groq_manager
+    def __init__(self, llm_manager: CustomLLMManager, model: str) -> None:
+        self.llm_manager = llm_manager
         self.model = model
         self._classifier = IntentClassifier()
 
@@ -60,7 +60,7 @@ class AgentRouter:
     def _llm_route(self, query: str) -> str:
         prompt = _ROUTING_PROMPT.format(query=query)
         try:
-            response = self.groq_manager.generate(model=self.model, prompt=prompt)
+            response = self.llm_manager.generate(model=self.model, prompt=prompt)
             tool = self._parse_tool(response)
             logger.info(f"AgentRouter (LLM): '{tool}' for query: {query!r}")
             return tool

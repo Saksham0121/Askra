@@ -1,10 +1,10 @@
 """
-Code Tool — uses GroqManager.
+Code Tool — uses CustomLLMManager.
 """
 from __future__ import annotations
 from pipeline.agent.base_tool import BaseTool, ToolResult
 from pipeline.core.logging import LoggerManager
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from pipeline.pipeline.pipeline_result import AnswerSource
 
 logger = LoggerManager.get_logger()
@@ -36,14 +36,14 @@ class CodeTool(BaseTool):
 
     name = "code"
 
-    def __init__(self, groq_manager: GroqManager, model: str) -> None:
-        self.groq_manager = groq_manager
+    def __init__(self, llm_manager: CustomLLMManager, model: str) -> None:
+        self.llm_manager = llm_manager
         self.model = model
 
     def execute(self, query: str) -> ToolResult:
         logger.info(f"CodeTool executing for query: {query!r}")
         prompt = _CODE_PROMPT.format(query=query, history_block="")
-        answer = self.groq_manager.generate(model=self.model, prompt=prompt)
+        answer = self.llm_manager.generate(model=self.model, prompt=prompt)
         answer = answer.strip()
         logger.info("CodeTool completed.")
         return ToolResult(answer=answer, answer_source=AnswerSource.CODE, sources=[], context="")
@@ -53,7 +53,7 @@ class CodeTool(BaseTool):
         yield {"type": "status", "message": "Writing code..."}
         history_block = _build_history_block(history or [])
         prompt = _CODE_PROMPT.format(query=query, history_block=history_block)
-        stream = self.groq_manager.generate_stream(model=self.model, prompt=prompt)
+        stream = self.llm_manager.generate_stream(model=self.model, prompt=prompt)
         answer = "".join(stream).strip()
         logger.info("CodeTool streaming completed.")
         yield {"type": "result", "data": ToolResult(

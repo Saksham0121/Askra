@@ -1,5 +1,5 @@
 """
-AgenticPipeline adapted for GroqManager.
+AgenticPipeline adapted for CustomLLMManager.
 Full 7-layer orchestrator.
 """
 from __future__ import annotations

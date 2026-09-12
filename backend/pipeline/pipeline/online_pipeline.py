@@ -1,7 +1,7 @@
 """
 Online RAG Pipeline.
 
-Coordinates the online retrieval pipeline with GroqManager.
+Coordinates the online retrieval pipeline with CustomLLMManager.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from pipeline.retrieval import HybridRetriever
 from pipeline.reranking import CrossEncoderReranker
 from pipeline.context import ContextBuilder
 from pipeline.generation import PromptBuilder
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from pipeline.models import EmbeddedChunk
 from pipeline.core.logging import LoggerManager
 
@@ -28,14 +28,14 @@ class OnlinePipeline:
         reranker: CrossEncoderReranker,
         context_builder: ContextBuilder,
         prompt_builder: PromptBuilder,
-        groq_manager: GroqManager,
+        llm_manager: CustomLLMManager,
         chat_model: str,
     ) -> None:
         self.retriever = retriever
         self.reranker = reranker
         self.context_builder = context_builder
         self.prompt_builder = prompt_builder
-        self.groq_manager = groq_manager
+        self.llm_manager = llm_manager
         self.chat_model = chat_model
 
     def retrieve_candidates(self, query: str) -> list[EmbeddedChunk]:
@@ -58,7 +58,7 @@ class OnlinePipeline:
         return self.prompt_builder.build(query=query, context=context, history_block=history_block)
 
     def _generate(self, prompt: str) -> str:
-        return self.groq_manager.generate(model=self.chat_model, prompt=prompt)
+        return self.llm_manager.generate(model=self.chat_model, prompt=prompt)
 
     def ask(self, query: str) -> str:
         logger.info(f"Received query: {query}")
@@ -83,5 +83,5 @@ class OnlinePipeline:
         chunks = self._retrieve(query)
         context = self._build_context(chunks)
         prompt = self._build_prompt(query, context)
-        stream = self.groq_manager.generate_stream(model=self.chat_model, prompt=prompt)
+        stream = self.llm_manager.generate_stream(model=self.chat_model, prompt=prompt)
         return stream, chunks, context
