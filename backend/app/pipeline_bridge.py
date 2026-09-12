@@ -1,9 +1,9 @@
 """
 Pipeline Bridge.
 
-Creates and wires the full AgenticPipeline using GroqManager
-instead of OllamaManager. This is the single entry point
-for FastAPI endpoints to interact with the pipeline.
+Creates and wires the full AgenticPipeline using CustomLLMManager
+(self-hosted OpenAI-compatible endpoint) instead of GroqManager.
+This is the single entry point for FastAPI endpoints to interact with the pipeline.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from pipeline.validation.guardrail import Guardrail
 from pipeline.validation.query_rewriter import QueryRewriter
 from pipeline.validation.validation_layer import ValidationLayer
 
-from pipeline.llm.groq_manager import GroqManager
+from pipeline.llm.custom_llm_manager import CustomLLMManager
 from app.config import get_settings
 
 import logging
@@ -54,7 +54,10 @@ class PipelineBridge:
             settings = get_settings()
 
         self._settings = settings
-        self._groq = GroqManager(api_key=settings.groq_api_key)
+        self._llm = CustomLLMManager(
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key,
+        )
 
         # ── Embedding model (local, free) ───────────────────────────────
         self._embedding_manager = EmbeddingManager(
@@ -111,31 +114,31 @@ class PipelineBridge:
             reranker=self._reranker,
             context_builder=self._context_builder,
             prompt_builder=self._prompt_builder,
-            groq_manager=self._groq,
-            chat_model=settings.groq_chat_model,
+            groq_manager=self._llm,
+            chat_model=settings.llm_chat_model,
         )
 
         # ── Tools ────────────────────────────────────────────────────────
         self._chat_tool = ChatTool(
-            groq_manager=self._groq,
-            model=settings.groq_chat_model,
+            groq_manager=self._llm,
+            model=settings.llm_chat_model,
         )
 
         self._code_tool = CodeTool(
-            groq_manager=self._groq,
-            model=settings.groq_code_model,
+            groq_manager=self._llm,
+            model=settings.llm_code_model,
         )
 
         self._rag_tool = RAGTool(
             online_pipeline=self._online_pipeline,
-            groq_manager=self._groq,
-            fallback_model=settings.groq_chat_model,
+            groq_manager=self._llm,
+            fallback_model=settings.llm_chat_model,
         )
 
         # ── Validation layer ─────────────────────────────────────────────
         self._validator = ValidationLayer(
-            groq_manager=self._groq,
-            model=settings.groq_chat_model,
+            groq_manager=self._llm,
+            model=settings.llm_chat_model,
             threshold=settings.confidence_threshold,
             weights={
                 "correctness": 0.5,
@@ -149,8 +152,8 @@ class PipelineBridge:
 
         # ── Query rewriter ───────────────────────────────────────────────
         self._query_rewriter = QueryRewriter(
-            groq_manager=self._groq,
-            model=settings.groq_rewriter_model,
+            groq_manager=self._llm,
+            model=settings.llm_rewriter_model,
         )
 
         # ── Guardrail ────────────────────────────────────────────────────
@@ -158,8 +161,8 @@ class PipelineBridge:
 
         # ── Router ───────────────────────────────────────────────────────
         self._router = AgentRouter(
-            groq_manager=self._groq,
-            model=settings.groq_router_model,
+            groq_manager=self._llm,
+            model=settings.llm_router_model,
         )
 
         # ── OCR service + tool ──────────────────────────────────────────────

@@ -30,11 +30,12 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongodb:27017
       - MONGODB_DB_NAME=askrab
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GROQ_CHAT_MODEL=llama-3.1-8b-instant
-      - GROQ_CODE_MODEL=llama-3.1-8b-instant
-      - GROQ_ROUTER_MODEL=llama-3.1-8b-instant
-      - GROQ_REWRITER_MODEL=llama-3.1-8b-instant
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://llm.saranshh.me/v1}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_CHAT_MODEL=${LLM_CHAT_MODEL:-gemma}
+      - LLM_CODE_MODEL=${LLM_CODE_MODEL:-gemma}
+      - LLM_ROUTER_MODEL=${LLM_ROUTER_MODEL:-gemma}
+      - LLM_REWRITER_MODEL=${LLM_REWRITER_MODEL:-gemma}
       - JWT_SECRET=${JWT_SECRET:-askrab-super-secret-jwt-key-change-in-production}
       - APP_ENV=production
       - CORS_ORIGINS=http://localhost,http://localhost:5173,http://localhost:80

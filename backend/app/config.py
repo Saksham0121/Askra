@@ -21,7 +21,15 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ── LLM (Groq) ─────────────────────────────────────────────────────
+    # ── LLM (Custom self-hosted OpenAI-compatible) ──────────────────────
+    llm_base_url: str = "https://llm.saranshh.me/v1"
+    llm_api_key: str = "<api-key>"
+    llm_chat_model: str = "gemma"
+    llm_code_model: str = "gemma"
+    llm_router_model: str = "gemma"
+    llm_rewriter_model: str = "gemma"
+
+    # ── Legacy Groq (kept for backwards compatibility, unused) ───────────
     groq_api_key: str = ""
     groq_chat_model: str = "llama-3.1-8b-instant"
     groq_code_model: str = "llama-3.1-8b-instant"
