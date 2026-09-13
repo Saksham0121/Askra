@@ -86,18 +86,37 @@ class RAGTool(BaseTool):
         context = self.online_pipeline._build_context(chunks)
         prompt = self.online_pipeline._build_prompt(query, context, history_block=history_block)
 
-        yield {"type": "status", "message": "✍️ Drafting your answer..."}
-        stream = self.online_pipeline.llm_manager.generate_stream(
-            model=self.online_pipeline.chat_model, prompt=prompt
-        )
-        answer = "".join(stream)
-
-        if self._is_fallback(answer, chunks):
-            logger.info("RAGTool: fallback detected. Generating fallback now.")
+        if not chunks:
+            logger.info("RAGTool: no chunks found — streaming fallback directly.")
             yield {"type": "status", "message": "💡 No relevant doc found — drawing on general knowledge..."}
             prompt = _FALLBACK_PROMPT.format(query=query, history_block=history_block)
-            fallback_stream = self.llm_manager.generate_stream(model=self.fallback_model, prompt=prompt)
-            answer = "".join(fallback_stream)
+            full_chunks = []
+            for chunk in self.llm_manager.generate_stream(model=self.fallback_model, prompt=prompt):
+                full_chunks.append(chunk)
+                yield {"type": "token", "content": chunk}
+            answer = "".join(full_chunks)
+            yield {"type": "result", "data": ToolResult(
+                answer=answer, answer_source=AnswerSource.RAG_FALLBACK, sources=[], context=""
+            )}
+            return
+
+        yield {"type": "status", "message": "✍️ Drafting your answer..."}
+        full_chunks = []
+        for chunk in self.online_pipeline.llm_manager.generate_stream(
+            model=self.online_pipeline.chat_model, prompt=prompt
+        ):
+            full_chunks.append(chunk)
+            yield {"type": "token", "content": chunk}
+        answer = "".join(full_chunks)
+
+        if self._is_fallback(answer, chunks):
+            logger.info("RAGTool: fallback phrase detected in answer.")
+            prompt = _FALLBACK_PROMPT.format(query=query, history_block=history_block)
+            full_fb = []
+            for chunk in self.llm_manager.generate_stream(model=self.fallback_model, prompt=prompt):
+                full_fb.append(chunk)
+                yield {"type": "token", "content": chunk}
+            answer = "".join(full_fb)
             yield {"type": "result", "data": ToolResult(
                 answer=answer, answer_source=AnswerSource.RAG_FALLBACK, sources=[], context=""
             )}
@@ -106,6 +125,7 @@ class RAGTool(BaseTool):
             yield {"type": "result", "data": ToolResult(
                 answer=answer, answer_source=AnswerSource.RAG, sources=sources, context=context
             )}
+
 
     def _is_fallback(self, answer: str, chunks: list[EmbeddedChunk]) -> bool:
         if not chunks:

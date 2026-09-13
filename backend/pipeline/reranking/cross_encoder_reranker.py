@@ -50,6 +50,10 @@ class CrossEncoderReranker:
 
         return self._model
 
+    def warmup(self) -> None:
+        """Pre-load model weights into memory on startup to eliminate cold-start latency."""
+        _ = self.model
+
     # Reorders chunks based on relevance scores.
     def rerank(
         self,

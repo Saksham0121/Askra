@@ -104,7 +104,17 @@ class PipelineBridge:
             model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
         )
 
+        # ── Warm up models on startup (eliminates 2-3s cold-start penalty) ───
+        try:
+            logger.info("Pre-warming embedding model and cross-encoder reranker...")
+            self._embedding_manager.warmup()
+            self._reranker.warmup()
+            logger.info("Models pre-warmed successfully (zero cold-start penalty).")
+        except Exception as exc:
+            logger.warning(f"Model pre-warm warning: {exc}")
+
         # ── Context + prompt builders ────────────────────────────────────
+
         self._context_builder = ContextBuilder()
         self._prompt_builder = PromptBuilder()
 

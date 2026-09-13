@@ -99,7 +99,9 @@ export default function (data) {
   const streamOk = check(streamRes, {
     'stream GET status 200': (r) => r.status === 200,
     'stream has data chunks': (r) => r.body && r.body.includes('data:'),
+    'stream yields real tokens': (r) => r.body && r.body.includes('"type": "token"'),
   });
+
 
   streamSuccessRate.add(streamOk);
   ttfbTrend.add(streamRes.timings.waiting);

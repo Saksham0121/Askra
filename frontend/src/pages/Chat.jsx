@@ -225,6 +225,15 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar, onSel
             const idx = PIPELINE_LAYERS.findIndex(l => l.id === layer);
             setDoneLayerIds(PIPELINE_LAYERS.slice(0, idx).map(l => l.id));
           }
+        } else if (event.type === 'token') {
+          setStatusMsg('');
+          setMessages(prev => prev.map(m =>
+            m.id === assistantMsg.id ? {
+              ...m,
+              content: (m.content || '') + event.content,
+              streaming: true,
+            } : m
+          ));
         } else if (event.type === 'result') {
           if (event.session_id) {
             setSessionId(event.session_id);
@@ -235,7 +244,6 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar, onSel
           setStatusMsg('');
           es.close();
 
-          // Typewriter animation — type out the full answer char-by-char
           const fullAnswer = event.answer || '';
           const metadata = {
             sources: event.sources || [],
@@ -248,29 +256,22 @@ export default function ChatWindow({ activeSessionId, toggleMobileSidebar, onSel
             validation_reasoning: event.validation_reasoning,
           };
 
-          let charIndex = 0;
-          if (typewriterRef.current) clearInterval(typewriterRef.current);
+          if (typewriterRef.current) {
+            clearInterval(typewriterRef.current);
+            typewriterRef.current = null;
+          }
 
-          typewriterRef.current = setInterval(() => {
-            charIndex++;
-            const slice = fullAnswer.slice(0, charIndex);
-            const done = charIndex >= fullAnswer.length;
+          // Instantly finalize message with complete answer and metadata
+          setMessages(prev => prev.map(m =>
+            m.id === assistantMsg.id ? {
+              ...m,
+              content: fullAnswer,
+              streaming: false,
+              ...metadata,
+            } : m
+          ));
+          setIsStreaming(false);
 
-            setMessages(prev => prev.map(m =>
-              m.id === assistantMsg.id ? {
-                ...m,
-                content: slice,
-                streaming: !done,
-                ...(done ? metadata : {}),
-              } : m
-            ));
-
-            if (done) {
-              clearInterval(typewriterRef.current);
-              typewriterRef.current = null;
-              setIsStreaming(false);
-            }
-          }, 8); // ~125 chars/sec — fast but visibly animated
 
         } else if (event.type === 'error') {
           setMessages(prev => prev.map(m =>

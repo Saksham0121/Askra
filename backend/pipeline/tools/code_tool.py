@@ -53,9 +53,15 @@ class CodeTool(BaseTool):
         yield {"type": "status", "message": "Writing code..."}
         history_block = _build_history_block(history or [])
         prompt = _CODE_PROMPT.format(query=query, history_block=history_block)
-        stream = self.llm_manager.generate_stream(model=self.model, prompt=prompt)
-        answer = "".join(stream).strip()
+        
+        full_chunks = []
+        for chunk in self.llm_manager.generate_stream(model=self.model, prompt=prompt):
+            full_chunks.append(chunk)
+            yield {"type": "token", "content": chunk}
+
+        answer = "".join(full_chunks).strip()
         logger.info("CodeTool streaming completed.")
         yield {"type": "result", "data": ToolResult(
             answer=answer, answer_source=AnswerSource.CODE, sources=[], context=""
         )}
+
