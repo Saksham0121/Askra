@@ -135,7 +135,13 @@ export default function (data) {
 
     const isSuccess = check(chatRes, {
       'chat status 200': (r) => r.status === 200,
-      'chat answer returned': (r) => r.json('answer') !== undefined,
+      'chat answer returned': (r) => {
+        try {
+          return r.status === 200 && r.json('answer') !== undefined;
+        } catch (_) {
+          return false;
+        }
+      },
     });
 
     if (isSuccess) {

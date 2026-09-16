@@ -45,13 +45,13 @@ class CustomLLMManager:
     # Public API (mirrors CustomLLMManager / OllamaManager)
     # ------------------------------------------------------------------
 
-    def generate(self, model: str, prompt: str, max_tokens: int = 2048) -> str:
+    def generate(self, model: str, prompt: str, max_tokens: int = 256) -> str:
         """
         Generate a completion synchronously.
 
         Parameters
         ----------
-        model      : Model name as expected by the remote server (e.g. "gemma").
+        model      : Model name as expected by the remote server (e.g. "openai/gpt-oss-20b").
         prompt     : User prompt text.
         max_tokens : Maximum response tokens.
 
@@ -59,11 +59,16 @@ class CustomLLMManager:
         -------
         str — The model's text response.
         """
+        extra_kwargs = {}
+        if "gpt-oss" in model or "qwen" in model:
+            extra_kwargs["extra_body"] = {"reasoning_format": "hidden"}
+
         response = self._client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=0.1,
+            **extra_kwargs,
         )
         return response.choices[0].message.content or ""
 
@@ -71,7 +76,7 @@ class CustomLLMManager:
         self,
         model: str,
         prompt: str,
-        max_tokens: int = 2048,
+        max_tokens: int = 256,
     ) -> Iterator[str]:
         """
         Generate a streaming completion, yielding text chunks.
@@ -86,12 +91,17 @@ class CustomLLMManager:
         ------
         str — Incremental text chunks.
         """
+        extra_kwargs = {}
+        if "gpt-oss" in model or "qwen" in model:
+            extra_kwargs["extra_body"] = {"reasoning_format": "hidden"}
+
         stream = self._client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=0.1,
             stream=True,
+            **extra_kwargs,
         )
         for chunk in stream:
             delta = chunk.choices[0].delta

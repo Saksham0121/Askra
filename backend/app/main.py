@@ -28,6 +28,14 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info(f"Environment: {settings.app_env}")
 
+    # Configure high-capacity thread pool executor for non-blocking pipeline offloading
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    loop = asyncio.get_running_loop()
+    executor = ThreadPoolExecutor(max_workers=64, thread_name_prefix="askra-pipeline")
+    loop.set_default_executor(executor)
+    logger.info("ThreadPoolExecutor configured with 64 workers for pipeline offloading.")
+
     # Ensure optimal MongoDB compound indexes exist
     try:
         await init_indexes()
@@ -46,6 +54,7 @@ async def lifespan(app: FastAPI):
 
     # ── Shutdown ─────────────────────────────────────────────────────────
     logger.info("Askrab shutting down...")
+    executor.shutdown(wait=False)
     await close_connection()
 
 

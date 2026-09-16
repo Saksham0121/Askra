@@ -12,10 +12,12 @@ from .dense_retriever import DenseRetriever
 from .sparse_retriever import SparseRetriever
 
 
+from concurrent.futures import ThreadPoolExecutor
+
 # Combines dense and sparse retrieval results.
 class HybridRetriever:
     """
-    Hybrid retriever using Reciprocal Rank Fusion.
+    Hybrid retriever using Reciprocal Rank Fusion with Parallel Execution.
     """
 
     # Initializes retrievers and RRFK parameter values.
@@ -32,6 +34,8 @@ class HybridRetriever:
 
         self.rrf_k = rrf_k
 
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="askra-retriever")
+
     # Retrieves relevant documents based on the query.
     def retrieve(
         self,
@@ -39,18 +43,24 @@ class HybridRetriever:
         top_k: int = 5,
     ) -> list[EmbeddedChunk]:
         """
-        Retrieve documents using hybrid retrieval.
+        Retrieve documents using parallel hybrid retrieval.
+        Runs FAISS dense search and BM25 sparse search concurrently.
         """
 
-        dense_results = self.dense_retriever.retrieve(
+        dense_future = self._executor.submit(
+            self.dense_retriever.retrieve,
             query,
             top_k=top_k,
         )
 
-        sparse_results = self.sparse_retriever.retrieve(
+        sparse_future = self._executor.submit(
+            self.sparse_retriever.retrieve,
             query,
             top_k=top_k,
         )
+
+        dense_results = dense_future.result()
+        sparse_results = sparse_future.result()
 
         scores = defaultdict(float)
 

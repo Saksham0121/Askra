@@ -2,6 +2,7 @@
 Chat API — POST /api/chat and GET /api/chat/stream (SSE).
 """
 from __future__ import annotations
+import asyncio
 import json
 from datetime import datetime, timezone
 from typing import AsyncGenerator
@@ -71,7 +72,8 @@ def _make_session_name(query: str) -> str:
 @router.post("", response_model=ChatResponse)
 async def chat(body: ChatRequest, current_user: UserInDB = Depends(get_current_user)):
     bridge = get_pipeline_bridge()
-    result = bridge.run(query=body.query, direct_rag=body.direct_rag)
+    # Offload blocking synchronous pipeline execution to worker thread pool
+    result = await asyncio.to_thread(bridge.run, query=body.query, direct_rag=body.direct_rag)
 
     # Ensure / create session
     session_id = body.session_id
@@ -109,6 +111,35 @@ async def chat(body: ChatRequest, current_user: UserInDB = Depends(get_current_u
     )
 
 
+async def _stream_events_offloaded(bridge, query: str, direct_rag: bool, history: list[dict]):
+    """
+    Bridge synchronous bridge.run_stream generator to non-blocking async generator
+    by executing the blocking generator in a thread pool and transferring events via an asyncio.Queue.
+    """
+    q: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    _DONE = object()
+
+    def _producer():
+        try:
+            for event in bridge.run_stream(query=query, direct_rag=direct_rag, history=history):
+                loop.call_soon_threadsafe(q.put_nowait, event)
+        except Exception as err:
+            loop.call_soon_threadsafe(q.put_nowait, err)
+        finally:
+            loop.call_soon_threadsafe(q.put_nowait, _DONE)
+
+    asyncio.create_task(asyncio.to_thread(_producer))
+
+    while True:
+        item = await q.get()
+        if item is _DONE:
+            break
+        if isinstance(item, Exception):
+            raise item
+        yield item
+
+
 async def _sse_generator(
     query: str,
     direct_rag: bool,
@@ -119,7 +150,7 @@ async def _sse_generator(
     bridge = get_pipeline_bridge()
     result_data = {}
     try:
-        for event in bridge.run_stream(query=query, direct_rag=direct_rag, history=history or []):
+        async for event in _stream_events_offloaded(bridge, query, direct_rag, history or []):
             if event["type"] == "result":
                 r = event["data"]
                 result_data = {
@@ -151,6 +182,7 @@ async def _sse_generator(
     finally:
         if result_data:
             await _log_message(session_id, user_id, query, result_data)
+
 
 
 @router.get("/stream")
