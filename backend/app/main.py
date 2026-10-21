@@ -28,13 +28,14 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info(f"Environment: {settings.app_env}")
 
-    # Configure high-capacity thread pool executor for non-blocking pipeline offloading
+    # Configure thread pool executor sized appropriately for instance resources
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     loop = asyncio.get_running_loop()
-    executor = ThreadPoolExecutor(max_workers=64, thread_name_prefix="askra-pipeline")
+    max_workers = getattr(settings, "max_pipeline_workers", 4)
+    executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="askra-pipeline")
     loop.set_default_executor(executor)
-    logger.info("ThreadPoolExecutor configured with 64 workers for pipeline offloading.")
+    logger.info(f"ThreadPoolExecutor configured with {max_workers} workers for pipeline offloading.")
 
     # Ensure optimal MongoDB compound indexes exist
     try:

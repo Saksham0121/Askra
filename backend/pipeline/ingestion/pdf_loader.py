@@ -12,7 +12,7 @@ PyPDF2
 
 from pathlib import Path
 
-import fitz
+import pymupdf as fitz
 import pdfplumber
 from pypdf import PdfReader
 

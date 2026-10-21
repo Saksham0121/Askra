@@ -170,7 +170,7 @@ class OCRService:
     @staticmethod
     def _pdf_to_images(pdf_path: str, dpi: int = 300) -> tuple[list[str], str]:
         """Convert PDF pages to PNG images in a temp directory."""
-        import fitz  # PyMuPDF
+        import pymupdf as fitz  # PyMuPDF
 
         doc = fitz.open(pdf_path)
         tmp_dir = tempfile.mkdtemp(prefix="ocr_pdf_")

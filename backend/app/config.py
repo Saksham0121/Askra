@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     hallucination_threshold: float = 0.3
     confidence_threshold: float = 5.5
 
+    # ── Pipeline & Resource Tuning (Optimized for 512MB RAM) ───────────
+    reranker_enabled: bool = True
+    reranker_model: str = "ms-marco-TinyBERT-L-2-v2"
+    embedding_model: str = "all-MiniLM-L6-v2"
+    max_pipeline_workers: int = 4
+
     # ── OCR (Unlimited-OCR via SGLang) ─────────────────────────────────
     ocr_server_url: str = "http://127.0.0.1:10000"
     ocr_enabled: bool = True

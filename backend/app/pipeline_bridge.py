@@ -59,9 +59,9 @@ class PipelineBridge:
             api_key=settings.llm_api_key,
         )
 
-        # ── Embedding model (local, free) ───────────────────────────────
+        # ── Embedding model (local, fast ONNX) ───────────────────────────
         self._embedding_manager = EmbeddingManager(
-            model_name="all-MiniLM-L6-v2"   # 384-dim, fast, free
+            model_name=getattr(settings, "embedding_model", "all-MiniLM-L6-v2")
         )
 
         # ── FAISS vector store ───────────────────────────────────────────
@@ -99,17 +99,18 @@ class PipelineBridge:
             sparse_retriever=sparse_retriever,
         )
 
-        # ── Reranker ─────────────────────────────────────────────────────
+        # ── Reranker (ultra-lightweight ONNX or toggleable) ───────────────
         self._reranker = CrossEncoderReranker(
-            model_name="cross-encoder/ms-marco-MiniLM-L-6-v2"
+            model_name=getattr(settings, "reranker_model", "ms-marco-TinyBERT-L-2-v2"),
+            enabled=getattr(settings, "reranker_enabled", True),
         )
 
-        # ── Warm up models on startup (eliminates 2-3s cold-start penalty) ───
+        # ── Warm up models on startup (eliminates cold-start penalty) ───────
         try:
-            logger.info("Pre-warming embedding model and cross-encoder reranker...")
+            logger.info("Pre-warming embedding model and reranker...")
             self._embedding_manager.warmup()
             self._reranker.warmup()
-            logger.info("Models pre-warmed successfully (zero cold-start penalty).")
+            logger.info("Models pre-warmed successfully.")
         except Exception as exc:
             logger.warning(f"Model pre-warm warning: {exc}")
 

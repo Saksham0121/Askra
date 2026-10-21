@@ -4,57 +4,98 @@ Cross Encoder Reranker.
 Re-ranks retrieved chunks using a cross-encoder model.
 """
 
-from sentence_transformers import CrossEncoder
+import os
+from typing import Any
 
 from pipeline.core.logging import LoggerManager
 from pipeline.models import EmbeddedChunk
 
 logger = LoggerManager.get_logger()
 
+# Check available reranker backends (flashrank ONNX preferred for <512MB RAM environments)
+try:
+    from flashrank import Ranker, RerankRequest
+    HAS_FLASHRANK = True
+except ImportError:
+    HAS_FLASHRANK = False
 
-# Re-ranks search results using a cross-encoder model.
+try:
+    from sentence_transformers import CrossEncoder
+    HAS_SENTENCE_TRANSFORMERS = True
+except ImportError:
+    HAS_SENTENCE_TRANSFORMERS = False
+
+
 class CrossEncoderReranker:
     """
-    Cross-encoder based reranker.
+    Reranker supporting ultra-lightweight ONNX via FlashRank (~4MB model, ~20MB RAM)
+    with toggle support and graceful fallbacks.
     """
 
-    # Sets the model name and initializes the model.
     def __init__(
         self,
-        model_name: str,
+        model_name: str = "ms-marco-TinyBERT-L-2-v2",
+        enabled: bool = True,
+        cache_dir: str | None = None,
     ) -> None:
-
         self.model_name = model_name
+        self.enabled = enabled
+        self.cache_dir = cache_dir or os.environ.get("MODEL_CACHE_DIR", None)
+        self._model: Any = None
+        self._backend: str | None = None
 
-        self._model = None
+        if not self.enabled:
+            logger.info("Reranker is disabled by configuration. Retrieval will use dense/sparse hybrid ordering.")
+        elif HAS_FLASHRANK:
+            self._backend = "flashrank"
+        elif HAS_SENTENCE_TRANSFORMERS:
+            self._backend = "sentence_transformers"
+        else:
+            self._backend = None
+            logger.warning("No reranking library (flashrank or sentence-transformers) found. Pass-through mode active.")
 
     @property
-    # Loads and returns the CrossEncoder model.
-    def model(
-        self,
-    ) -> CrossEncoder:
+    def model(self) -> Any:
+        """
+        Lazy-load the reranker model using the leanest available engine.
+        """
+        if not self.enabled:
+            return None
 
-        if self._model is None:
-
-            logger.info(
-                f"Loading reranker: {self.model_name}"
-            )
-
-            self._model = CrossEncoder(
-                self.model_name
-            )
-
-            logger.info(
-                "Reranker loaded successfully."
-            )
+        if self._model is None and self._backend:
+            if self._backend == "flashrank":
+                logger.info(
+                    f"Loading ultra-lightweight ONNX reranker via FlashRank: {self.model_name} (cache_dir={self.cache_dir})"
+                )
+                self._model = Ranker(
+                    model_name=self.model_name,
+                    cache_dir=self.cache_dir or "/tmp",
+                )
+                logger.info("FlashRank ONNX reranker loaded successfully.")
+            elif self._backend == "sentence_transformers":
+                logger.info(
+                    f"Loading PyTorch reranker via SentenceTransformer: {self.model_name}"
+                )
+                self._model = CrossEncoder(self.model_name)
+                logger.info("SentenceTransformer reranker loaded successfully.")
 
         return self._model
 
     def warmup(self) -> None:
-        """Pre-load model weights into memory on startup to eliminate cold-start latency."""
-        _ = self.model
+        """Pre-load model weights into memory on startup if reranking is enabled."""
+        if not self.enabled:
+            return
+        try:
+            if self._backend == "flashrank":
+                # Warm up flashrank with a single dummy query
+                _ = self.model
+                req = RerankRequest(query="warmup", passages=[{"id": 0, "text": "warmup passage"}])
+                self.model.rerank(req)
+            elif self._backend == "sentence_transformers":
+                _ = self.model
+        except Exception as exc:
+            logger.warning(f"Reranker warmup warning: {exc}")
 
-    # Reorders chunks based on relevance scores.
     def rerank(
         self,
         query: str,
@@ -64,38 +105,33 @@ class CrossEncoderReranker:
         """
         Re-rank retrieved chunks.
         """
+        if not chunks:
+            return []
 
-        pairs = [
+        if not self.enabled or self.model is None:
+            return chunks[:top_k]
 
-            (
-                query,
-                chunk.chunk.text,
-            )
+        try:
+            if self._backend == "flashrank":
+                passages = [
+                    {"id": idx, "text": chunk.chunk.text}
+                    for idx, chunk in enumerate(chunks)
+                ]
+                req = RerankRequest(query=query, passages=passages)
+                results = self.model.rerank(req)
+                return [chunks[r["id"]] for r in results[:top_k]]
 
-            for chunk in chunks
-        ]
+            elif self._backend == "sentence_transformers":
+                pairs = [(query, chunk.chunk.text) for chunk in chunks]
+                scores = self.model.predict(pairs)
+                ranked = sorted(
+                    zip(chunks, scores),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )
+                return [chunk for chunk, _ in ranked[:top_k]]
 
-        scores = self.model.predict(
-            pairs
-        )
+        except Exception as exc:
+            logger.error(f"Reranking encountered an error ({exc}), falling back to candidate order.")
 
-        ranked = sorted(
-
-            zip(
-                chunks,
-                scores,
-            ),
-
-            key=lambda item: item[1],
-
-            reverse=True,
-
-        )
-
-        return [
-
-            chunk
-
-            for chunk, _ in ranked[:top_k]
-
-        ]
+        return chunks[:top_k]
